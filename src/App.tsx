@@ -11,15 +11,11 @@ import { DealsPipeline } from './components/crm/DealsPipeline';
 import { CompaniesList } from './components/crm/CompaniesList';
 import { SchoolRoutePlanner } from './components/routes/SchoolRoutePlanner';
 import { EventKitAndContentModule } from './components/events-kit/EventKitAndContentModule';
-import { CampaignAndCollateralGenerator } from './components/campaigns/CampaignAndCollateralGenerator';
-import { CommercialKitView } from './components/commercial-kit/CommercialKitView';
 import { 
   LayoutDashboard, 
   Building2, 
   MapPin, 
   Sparkles, 
-  Briefcase,
-  Megaphone,
   CheckCircle2,
   TrendingUp,
   Award,
@@ -27,7 +23,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 
-type MainView = 'crm-pipeline' | 'crm-schools' | 'routes' | 'events-kit' | 'campaigns' | 'commercial-kit';
+type MainView = 'crm-pipeline' | 'crm-schools' | 'routes' | 'events-kit';
 
 export function App() {
   const [currentView, setCurrentView] = useState<MainView>('crm-pipeline');
@@ -99,31 +95,6 @@ export function App() {
       id: `act-${Date.now()}`
     };
     setActivities((prev) => [newActivity, ...prev]);
-  };
-
-  // Agregar nueva campaña
-  const handleAddCampaign = (newCampaign: Campaign) => {
-    setCampaigns((prev) => [newCampaign, ...prev]);
-  };
-
-  // Registro automático cuando se envía una propuesta del Kit Comercial
-  const handleLogProposalSent = (schoolId: string, amount: number, packageName: string) => {
-    // 1. Agregar actividad de envío
-    handleAddActivity({
-      companyId: schoolId,
-      type: 'email',
-      title: `Propuesta Formal Enviada: ${packageName}`,
-      description: `Se remitió propuesta institucional con membrete oficial Develop por un monto de $${amount.toLocaleString('es-MX')} MXN para revisión del comité de vinculación.`,
-      date: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      completed: true,
-      author: 'Carlos Mendoza'
-    });
-
-    // 2. Si ya hay una oportunidad en fase previa, avanzarla a 'propuesta'
-    const existingDeal = deals.find((d) => d.companyId === schoolId && d.stage !== 'resultado');
-    if (existingDeal) {
-      handleUpdateDealStage(existingDeal.id, 'propuesta');
-    }
   };
 
   // Registrar itinerario de ruta en el CRM
@@ -261,30 +232,6 @@ export function App() {
                 <Sparkles className="w-4 h-4 text-[#a78bfa]" />
                 <span>Kits & IA</span>
               </button>
-
-              <button
-                onClick={() => setCurrentView('commercial-kit')}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
-                  currentView === 'commercial-kit'
-                    ? 'btn-primary-dark shadow-develop-glow'
-                    : 'text-white/75 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                <Briefcase className="w-4 h-4 text-[#f472b6]" />
-                <span>Propuestas</span>
-              </button>
-
-              <button
-                onClick={() => setCurrentView('campaigns')}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
-                  currentView === 'campaigns'
-                    ? 'btn-primary-dark shadow-develop-glow'
-                    : 'text-white/75 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                <Megaphone className="w-4 h-4" />
-                <span>Campañas</span>
-              </button>
             </nav>
 
             {/* Perfil del Ejecutivo Develop */}
@@ -312,7 +259,6 @@ export function App() {
             { id: 'crm-schools', label: 'Escuelas', icon: Building2 },
             { id: 'routes', label: 'Rutas', icon: MapPin },
             { id: 'events-kit', label: 'Kits IA', icon: Sparkles },
-            { id: 'commercial-kit', label: 'Propuestas', icon: Briefcase },
           ].map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -370,21 +316,6 @@ export function App() {
             selectedDealId={activeEventKitDealId}
             onUpdateDealLeads={handleUpdateDealLeads}
             onSelectSchoolForCRM={handleOpenSchoolInCRM}
-          />
-        )}
-
-        {currentView === 'campaigns' && (
-          <CampaignAndCollateralGenerator
-            campaigns={campaigns}
-            companies={companies}
-            onAddCampaign={handleAddCampaign}
-          />
-        )}
-
-        {currentView === 'commercial-kit' && (
-          <CommercialKitView
-            companies={companies}
-            onLogProposalSent={handleLogProposalSent}
           />
         )}
       </main>
