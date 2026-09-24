@@ -127,7 +127,7 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
   return (
     <div className="space-y-7">
       {/* HEADER HERO ESTÁTICO DEVELOP */}
-      <div className="internal-hero-surface rounded-[28px] p-7 lg:p-8 shadow-develop-modal border border-white/10 text-white relative">
+      <div className="internal-hero-surface rounded-[20px] sm:rounded-[28px] p-4 sm:p-7 lg:p-8 shadow-develop-modal border border-white/10 text-white relative">
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           <div className="space-y-2 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 pill-dark text-xs font-bold uppercase tracking-widest text-[#a78bfa]">
@@ -143,7 +143,7 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
           </div>
 
           {optimizedTrip && (
-            <div className="card-glass-dark px-6 py-4 rounded-2xl flex items-center gap-4 text-left border border-white/20 shrink-0">
+            <div className="card-glass-dark p-3.5 sm:px-6 sm:py-4 rounded-2xl flex items-center gap-3 sm:gap-4 text-left border border-white/20 shrink-0">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-[#29008e] to-[#f472b6] flex items-center justify-center font-bold text-white shadow-develop-box">
                 <TrendingUp className="w-6 h-6" />
               </div>
@@ -169,7 +169,7 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
       {/* PANEL DE CONFIGURACIÓN Y MAPA */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Columna Izquierda: Parámetros y Selector de Universidades (4 Columnas) */}
-        <div className="lg:col-span-4 card-light p-6 rounded-[24px] space-y-5">
+        <div className="lg:col-span-4 card-light p-4 sm:p-6 rounded-[24px] space-y-5">
           <div className="pb-3 border-b border-black/5">
             <h3 className="font-bold text-[#111111] flex items-center gap-2 text-base">
               <Navigation className="w-4 h-4 text-[#0f094f]" />
@@ -427,7 +427,7 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
                 </h3>
               </div>
 
-              <div className="flex items-center gap-2.5">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
                 <button
                   onClick={handleSaveToCRM}
                   className="btn-primary-develop px-3.5 py-1.5 text-xs font-bold flex items-center gap-1.5"
@@ -462,7 +462,7 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
 
       {/* ITINERARIO CRONOLÓGICO PASO A PASO */}
       {optimizedTrip && optimizedTrip.stops.length > 0 && (
-        <div className="card-light p-7 rounded-[28px]">
+        <div className="card-light p-4 sm:p-6 lg:p-7 rounded-[20px] sm:rounded-[28px]">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 pb-4 border-b border-black/5">
             <div>
               <h3 className="text-lg font-bold text-[#111111] flex items-center gap-2">
@@ -479,7 +479,7 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
             </div>
           </div>
 
-          <div className="relative border-l-2 border-dashed border-[#29008e]/30 ml-4 pl-6 space-y-6">
+          <div className="relative border-l-2 border-dashed border-[#29008e]/30 ml-3 pl-4 sm:ml-4 sm:pl-6 space-y-4 sm:space-y-6">
             {/* Punto de Inicio */}
             <div className="relative">
               <div className="absolute -left-[33px] top-1 w-6 h-6 rounded-full bg-[#0f094f] text-white flex items-center justify-center text-xs font-bold shadow-md">
@@ -499,7 +499,7 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
                   {stop.order}
                 </div>
                 
-                <div className="card-light card-light-hover p-5 rounded-[22px]">
+                <div className="card-light card-light-hover p-3.5 sm:p-5 rounded-[18px] sm:rounded-[22px]">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2">
@@ -511,7 +511,7 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
                       <p className="text-xs text-[#555555] mt-1">{stop.address}</p>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-2 md:mt-0">
                       <div className="text-left md:text-right">
                         <div className="text-xs font-bold text-[#111111] flex items-center gap-1 justify-start md:justify-end">
                           <Clock className="w-3.5 h-3.5 text-[#29008e]" />

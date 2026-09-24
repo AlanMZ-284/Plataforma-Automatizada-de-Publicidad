@@ -105,16 +105,17 @@ export const RouteMap: React.FC<RouteMapProps> = ({ origin, stops }) => {
 
       // Ajustar la vista del mapa a los límites de la ruta
       const bounds = L.latLngBounds(latLngs);
-      map.fitBounds(bounds, { padding: [40, 40] });
+      const fitPad = window.innerWidth < 640 ? 15 : 40;
+      map.fitBounds(bounds, { padding: [fitPad, fitPad] });
     }
   }, [origin, stops]);
 
   return (
-    <div className="relative w-full h-[480px] rounded-[24px] overflow-hidden border border-black/10 shadow-develop-card">
+    <div className="relative w-full h-[300px] sm:h-[380px] lg:h-[480px] rounded-[20px] sm:rounded-[24px] overflow-hidden border border-black/10 shadow-develop-card">
       <div ref={mapContainerRef} className="w-full h-full" />
       
       {/* Leyenda con Identidad Develop Glass */}
-      <div className="absolute top-4 right-4 z-[1000] bg-white/95 backdrop-blur-md px-4 py-3 rounded-2xl border border-black/10 shadow-develop-card text-xs font-medium space-y-1.5">
+      <div className="absolute bottom-3 right-3 sm:top-4 sm:right-4 sm:bottom-auto z-[1000] bg-white/95 backdrop-blur-md px-3 py-2 sm:px-4 sm:py-3 rounded-xl sm:rounded-2xl border border-black/10 shadow-develop-card text-[10px] sm:text-xs font-medium space-y-1 sm:space-y-1.5">
         <div className="flex items-center gap-2.5">
           <span className="w-3 h-3 rounded-full bg-[#0f094f] inline-block shadow-xs"></span>
           <span className="text-[#111111] font-semibold">Origen & Retorno (CDMX)</span>

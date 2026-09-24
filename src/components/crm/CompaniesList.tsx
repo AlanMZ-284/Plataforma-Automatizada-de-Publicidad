@@ -137,7 +137,7 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
             <button
               key={st}
               onClick={() => setSelectedState(st)}
-              className={`text-xs px-3.5 py-2 rounded-xl font-medium transition-all ${
+              className={`text-xs px-3.5 py-2 rounded-xl font-medium shrink-0 whitespace-nowrap transition-all ${
                 selectedState === st
                   ? 'btn-primary-develop'
                   : 'btn-secondary-light'
@@ -157,7 +157,7 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
           return (
             <div
               key={school.id}
-              className="card-light card-light-hover p-6 flex flex-col justify-between text-left group rounded-[24px]"
+              className="card-light card-light-hover p-4 sm:p-6 flex flex-col justify-between text-left group rounded-[24px]"
             >
               <div>
                 {/* Header de Tarjeta */}
@@ -271,9 +271,9 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
         <div className="fixed inset-0 z-50 bg-[#07052e]/60 backdrop-blur-xs flex items-center justify-center p-3 lg:p-6">
           <div className="bg-white w-full max-w-5xl max-h-[90vh] rounded-[28px] shadow-develop-modal border border-black/10 flex flex-col overflow-hidden animate-fadeIn">
             {/* Header Dark Premium del Expediente */}
-            <div className="p-6 premium-dark-surface text-white flex items-center justify-between shrink-0 relative border-b border-white/10">
+            <div className="p-4 sm:p-6 premium-dark-surface text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 relative border-b border-white/10">
               <div className="relative z-10 flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-2xl bg-white/10 text-white flex items-center justify-center font-bold text-xl border border-white/20 shadow-develop-glow/30">
+                <div className="w-12 h-12 rounded-2xl bg-white/10 text-white flex items-center justify-center font-bold text-xl border border-white/20 shadow-develop-glow/30 shrink-0">
                   <Building2 className="w-6 h-6 text-[#a78bfa]" />
                 </div>
                 <div>
@@ -285,7 +285,7 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
                       ★ Score: {activeCompany.leadScore}/100
                     </span>
                   </div>
-                  <h2 className="text-xl lg:text-2xl font-bold text-white mt-0.5">{activeCompany.name}</h2>
+                  <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-white mt-0.5">{activeCompany.name}</h2>
                   <p className="text-xs text-white/70 flex items-center gap-1.5 mt-0.5">
                     <MapPin className="w-3.5 h-3.5 text-[#a78bfa]" />
                     {activeCompany.address} ({activeCompany.municipality}, {activeCompany.state})
@@ -293,7 +293,7 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
                 </div>
               </div>
 
-              <div className="relative z-10 flex items-center gap-2.5">
+              <div className="relative z-10 flex items-center gap-2 sm:gap-2.5 shrink-0">
                 {onNavigateToRoutePlanner && (
                   <button
                     onClick={() => {
@@ -318,7 +318,7 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
             {/* Cuerpo del Modal: 2 Columnas */}
             <div className="grid grid-cols-1 lg:grid-cols-12 flex-1 overflow-y-auto divide-y lg:divide-y-0 lg:divide-x divide-black/5">
               {/* Columna Izquierda: Datos Institucionales y Convenios */}
-              <div className="lg:col-span-4 p-6 space-y-6 bg-[#F8F8FC]">
+              <div className="lg:col-span-4 p-4 sm:p-6 space-y-6 bg-[#F8F8FC]">
                 <div>
                   <h4 className="text-[10px] font-bold uppercase text-[#888888] tracking-widest mb-2.5">
                     Información Institucional
@@ -407,7 +407,7 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
               </div>
 
               {/* Columna Derecha: Timeline de Actividades y Registro Inmediato */}
-              <div className="lg:col-span-8 p-6 space-y-6 flex flex-col bg-white">
+              <div className="lg:col-span-8 p-4 sm:p-6 space-y-6 flex flex-col bg-white">
                 {/* Formulario Rápido de Registro de Interacción */}
                 <div className="card-light p-5 space-y-3.5 rounded-2xl">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -420,7 +420,7 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
                         <button
                           key={t}
                           onClick={() => setActivityType(t)}
-                          className={`text-xs px-3 py-1 rounded-lg font-semibold capitalize transition-all ${
+                          className={`text-xs px-3 py-1 rounded-lg font-semibold capitalize shrink-0 whitespace-nowrap transition-all ${
                             activityType === t
                               ? 'btn-primary-develop shadow-xs'
                               : 'bg-black/5 text-[#555555] hover:bg-black/10'
@@ -491,9 +491,9 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
                         </div>
 
                         <div className="flex-1 min-w-0 text-xs">
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-[#111111]">{act.title}</span>
-                            <span className="text-[10px] text-[#888888] font-mono">{act.date}</span>
+                          <div className="flex items-start sm:items-center justify-between gap-2">
+                            <span className="font-bold text-[#111111] truncate">{act.title}</span>
+                            <span className="text-[10px] text-[#888888] font-mono shrink-0">{act.date}</span>
                           </div>
                           <p className="text-[#555555] mt-1 leading-relaxed">{act.description}</p>
                           <div className="text-[10px] text-[#888888] mt-2 flex items-center gap-1.5">

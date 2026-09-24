@@ -308,7 +308,8 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
       </div>
 
       {/* TABLERO KANBAN DE VENTAS (6 COLUMNAS CON ESTILO ENTERPRISE DEVELOP) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 items-start">
+      <div className="overflow-x-auto pb-3 -mx-3 px-3 sm:mx-0 sm:px-0">
+        <div className="flex xl:grid xl:grid-cols-6 gap-4 items-start min-w-max xl:min-w-0">
         {STAGES_CONFIG.map(({ stage, label, color, bg, border, badge }) => {
           const stageDeals = filteredDeals.filter((d) => d.stage === stage);
           const stageTotal = stageDeals.reduce((acc, d) => acc + d.amount, 0);
@@ -316,7 +317,7 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
           return (
             <div
               key={stage}
-              className={`rounded-[22px] border ${border} ${bg} p-3.5 flex flex-col min-h-[520px] transition-all duration-200`}
+              className={`w-[260px] sm:w-[280px] xl:w-auto shrink-0 xl:shrink rounded-[22px] border ${border} ${bg} p-3.5 flex flex-col min-h-[520px] transition-all duration-200`}
             >
               {/* Encabezado de Columna */}
               <div className="pb-3 border-b border-black/5 mb-3">
@@ -467,7 +468,7 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                           className="w-full mt-1.5 py-1.5 px-2 bg-[#0f094f]/5 hover:bg-[#0f094f]/10 text-[#0f094f] rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all border border-[#0f094f]/10 group-hover:border-[#0f094f]/20"
                         >
                           <Sparkles className="w-3.5 h-3.5 text-[#29008e]" />
-                          <span>Ver Kit & Materiales ({deal.eventType.replace('_', ' ')})</span>
+                          <span className="truncate">Ver Kit & Materiales ({deal.eventType.replace('_', ' ')})</span>
                         </button>
                       )}
                     </div>
@@ -483,14 +484,15 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
             </div>
           );
         })}
+        </div>
       </div>
 
       {/* MODAL PARA CREAR NUEVA OPORTUNIDAD (DISEÑO DEVELOP ENTERPRISE) */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-[#07052e]/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-[28px] shadow-develop-modal border border-black/10 overflow-hidden animate-fadeIn">
+          <div className="bg-white w-full max-w-lg max-h-[90vh] rounded-[28px] shadow-develop-modal border border-black/10 overflow-hidden flex flex-col animate-fadeIn">
             {/* Header Dark Premium del Modal */}
-            <div className="p-6 premium-dark-surface text-white flex items-center justify-between border-b border-white/10 relative">
+            <div className="p-4 sm:p-6 premium-dark-surface text-white flex items-center justify-between border-b border-white/10 relative shrink-0">
               <div className="relative z-10">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-[#a78bfa] block">
                   CRM · Vinculación Institucional
@@ -506,7 +508,7 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleCreateDealSubmit} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleCreateDealSubmit} className="p-4 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1">
               <div className="space-y-1.5">
                 <label className="font-bold text-[#111111]">Título de la Iniciativa / Evento</label>
                 <input
@@ -519,7 +521,7 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="font-bold text-[#111111]">Universidad / Sede</label>
                   <select
@@ -550,7 +552,7 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
               </div>
 
               {/* Selector de Modalidad A vs B */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="font-bold text-[#111111]">Modalidad de Proyecto</label>
                   <select
@@ -584,7 +586,7 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="font-bold text-[#111111]">Etapa Inicial</label>
                   <select
@@ -635,7 +637,7 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                 />
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-black/5">
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3 pt-4 border-t border-black/5">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}

@@ -101,7 +101,7 @@ export const EventKitAndContentModule: React.FC<EventKitAndContentModuleProps> =
   return (
     <div className="space-y-7">
       {/* HEADER HERO ESTÁTICO DEVELOP */}
-      <div className="internal-hero-surface rounded-[28px] p-7 lg:p-8 shadow-develop-modal border border-white/10 text-white relative">
+      <div className="internal-hero-surface rounded-[20px] sm:rounded-[28px] p-4 sm:p-7 lg:p-8 shadow-develop-modal border border-white/10 text-white relative">
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           <div className="space-y-2 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 pill-dark text-xs font-bold uppercase tracking-widest text-[#a78bfa]">
@@ -145,7 +145,7 @@ export const EventKitAndContentModule: React.FC<EventKitAndContentModuleProps> =
 
       {/* BARRA DE SELECCIÓN DE EVENTO / UNIVERSIDAD */}
       <div className="card-light p-4 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex flex-1 items-center gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center flex-1 gap-2 sm:gap-3 w-full">
           <span className="text-[11px] font-bold uppercase text-[#888888] tracking-wider shrink-0">
             Evento Seleccionado:
           </span>
@@ -187,13 +187,13 @@ export const EventKitAndContentModule: React.FC<EventKitAndContentModuleProps> =
       {/* PESTAÑAS DINÁMICAS DEL KIT SEGÚN EL TIPO DE EVENTO */}
       <div className="card-light rounded-[28px] overflow-hidden">
         {/* Barra de Subpestañas */}
-        <div className="flex border-b border-black/5 bg-[#F8F8FC] px-5 pt-3 gap-2 overflow-x-auto">
+        <div className="flex border-b border-black/5 bg-[#F8F8FC] px-3 sm:px-5 pt-3 gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide">
           {/* CASO 1: FERIA DE TRABAJO */}
           {activeDeal.eventType === 'feria_trabajo' && (
             <>
               <button
                 onClick={() => setActiveSubTab('principal')}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all border-t border-x ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-xl text-xs font-bold shrink-0 whitespace-nowrap transition-all border-t border-x ${
                   activeSubTab === 'principal'
                     ? 'bg-white border-black/5 text-[#0f094f] shadow-xs border-b-2 border-b-white -mb-[1px]'
                     : 'border-transparent text-[#555555] hover:text-[#111111]'
@@ -205,7 +205,7 @@ export const EventKitAndContentModule: React.FC<EventKitAndContentModuleProps> =
 
               <button
                 onClick={() => setActiveSubTab('folleto')}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all border-t border-x ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-xl text-xs font-bold shrink-0 whitespace-nowrap transition-all border-t border-x ${
                   activeSubTab === 'folleto'
                     ? 'bg-white border-black/5 text-[#0f094f] shadow-xs border-b-2 border-b-white -mb-[1px]'
                     : 'border-transparent text-[#555555] hover:text-[#111111]'
@@ -217,7 +217,7 @@ export const EventKitAndContentModule: React.FC<EventKitAndContentModuleProps> =
 
               <button
                 onClick={() => setActiveSubTab('qr_registro')}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all border-t border-x ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-xl text-xs font-bold shrink-0 whitespace-nowrap transition-all border-t border-x ${
                   activeSubTab === 'qr_registro'
                     ? 'bg-white border-black/5 text-[#0f094f] shadow-xs border-b-2 border-b-white -mb-[1px]'
                     : 'border-transparent text-[#555555] hover:text-[#111111]'
@@ -229,7 +229,7 @@ export const EventKitAndContentModule: React.FC<EventKitAndContentModuleProps> =
 
               <button
                 onClick={() => setActiveSubTab('areas')}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all border-t border-x ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-xl text-xs font-bold shrink-0 whitespace-nowrap transition-all border-t border-x ${
                   activeSubTab === 'areas'
                     ? 'bg-white border-black/5 text-[#0f094f] shadow-xs border-b-2 border-b-white -mb-[1px]'
                     : 'border-transparent text-[#555555] hover:text-[#111111]'
@@ -246,7 +246,7 @@ export const EventKitAndContentModule: React.FC<EventKitAndContentModuleProps> =
             <>
               <button
                 onClick={() => setActiveSubTab('principal')}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all border-t border-x ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-xl text-xs font-bold shrink-0 whitespace-nowrap transition-all border-t border-x ${
                   activeSubTab === 'principal'
                     ? 'bg-white border-black/5 text-[#0f094f] shadow-xs border-b-2 border-b-white -mb-[1px]'
                     : 'border-transparent text-[#555555] hover:text-[#111111]'
@@ -258,7 +258,7 @@ export const EventKitAndContentModule: React.FC<EventKitAndContentModuleProps> =
 
               <button
                 onClick={() => setActiveSubTab('premios')}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all border-t border-x ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-xl text-xs font-bold shrink-0 whitespace-nowrap transition-all border-t border-x ${
                   activeSubTab === 'premios'
                     ? 'bg-white border-black/5 text-[#0f094f] shadow-xs border-b-2 border-b-white -mb-[1px]'
                     : 'border-transparent text-[#555555] hover:text-[#111111]'
@@ -270,7 +270,7 @@ export const EventKitAndContentModule: React.FC<EventKitAndContentModuleProps> =
 
               <button
                 onClick={() => setActiveSubTab('mentores')}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all border-t border-x ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-xl text-xs font-bold shrink-0 whitespace-nowrap transition-all border-t border-x ${
                   activeSubTab === 'mentores'
                     ? 'bg-white border-black/5 text-[#0f094f] shadow-xs border-b-2 border-b-white -mb-[1px]'
                     : 'border-transparent text-[#555555] hover:text-[#111111]'
@@ -282,7 +282,7 @@ export const EventKitAndContentModule: React.FC<EventKitAndContentModuleProps> =
 
               <button
                 onClick={() => setActiveSubTab('kit_bienvenida')}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all border-t border-x ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-xl text-xs font-bold shrink-0 whitespace-nowrap transition-all border-t border-x ${
                   activeSubTab === 'kit_bienvenida'
                     ? 'bg-white border-black/5 text-[#0f094f] shadow-xs border-b-2 border-b-white -mb-[1px]'
                     : 'border-transparent text-[#555555] hover:text-[#111111]'
@@ -299,7 +299,7 @@ export const EventKitAndContentModule: React.FC<EventKitAndContentModuleProps> =
             <>
               <button
                 onClick={() => setActiveSubTab('principal')}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all border-t border-x ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-xl text-xs font-bold shrink-0 whitespace-nowrap transition-all border-t border-x ${
                   activeSubTab === 'principal'
                     ? 'bg-white border-black/5 text-[#0f094f] shadow-xs border-b-2 border-b-white -mb-[1px]'
                     : 'border-transparent text-[#555555] hover:text-[#111111]'
@@ -311,7 +311,7 @@ export const EventKitAndContentModule: React.FC<EventKitAndContentModuleProps> =
 
               <button
                 onClick={() => setActiveSubTab('guion')}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all border-t border-x ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-xl text-xs font-bold shrink-0 whitespace-nowrap transition-all border-t border-x ${
                   activeSubTab === 'guion'
                     ? 'bg-white border-black/5 text-[#0f094f] shadow-xs border-b-2 border-b-white -mb-[1px]'
                     : 'border-transparent text-[#555555] hover:text-[#111111]'
@@ -323,7 +323,7 @@ export const EventKitAndContentModule: React.FC<EventKitAndContentModuleProps> =
 
               <button
                 onClick={() => setActiveSubTab('difusion')}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all border-t border-x ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-xl text-xs font-bold shrink-0 whitespace-nowrap transition-all border-t border-x ${
                   activeSubTab === 'difusion'
                     ? 'bg-white border-black/5 text-[#0f094f] shadow-xs border-b-2 border-b-white -mb-[1px]'
                     : 'border-transparent text-[#555555] hover:text-[#111111]'
@@ -335,7 +335,7 @@ export const EventKitAndContentModule: React.FC<EventKitAndContentModuleProps> =
 
               <button
                 onClick={() => setActiveSubTab('seguimiento')}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all border-t border-x ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-xl text-xs font-bold shrink-0 whitespace-nowrap transition-all border-t border-x ${
                   activeSubTab === 'seguimiento'
                     ? 'bg-white border-black/5 text-[#0f094f] shadow-xs border-b-2 border-b-white -mb-[1px]'
                     : 'border-transparent text-[#555555] hover:text-[#111111]'
@@ -349,7 +349,7 @@ export const EventKitAndContentModule: React.FC<EventKitAndContentModuleProps> =
         </div>
 
         {/* CONTENIDO INTERACTIVO DE CADA PESTAÑA */}
-        <div className="p-7 bg-white min-h-[500px]">
+        <div className="p-4 sm:p-6 lg:p-7 bg-white min-h-[400px] sm:min-h-[500px]">
           {/* ============================================================== */}
           {/* VISTAS PARA: FERIA DE TRABAJO                                 */}
           {/* ============================================================== */}
@@ -374,8 +374,8 @@ export const EventKitAndContentModule: React.FC<EventKitAndContentModuleProps> =
 
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
                     {/* Render visual del Stand con Premium Dark Surface */}
-                    <div className="lg:col-span-8 premium-dark-surface p-7 rounded-[26px] text-white shadow-develop-modal relative overflow-hidden flex flex-col justify-between min-h-[360px] border border-white/10">
-                      <div className="flex justify-between items-start relative z-10">
+                    <div className="lg:col-span-8 premium-dark-surface p-4 sm:p-7 rounded-[20px] sm:rounded-[26px] text-white shadow-develop-modal relative overflow-hidden flex flex-col justify-between min-h-[300px] sm:min-h-[360px] border border-white/10">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 relative z-10">
                         <div className="flex items-center gap-2.5">
                           <span className="px-3 py-1 bg-white text-[#07052e] rounded-xl font-extrabold text-xs shadow-develop-glow">
                             DEVELOP STAND
@@ -400,7 +400,7 @@ export const EventKitAndContentModule: React.FC<EventKitAndContentModuleProps> =
                         </p>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2.5 pt-4 border-t border-white/15 text-center text-[11px] relative z-10">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-2.5 pt-4 border-t border-white/15 text-center text-[11px] relative z-10">
                         <div className="bg-white/10 p-2.5 rounded-xl border border-white/10">
                           <div className="font-bold text-white">Modalidad Dual</div>
                           <div className="text-[10px] text-white/60">Acreditación Oficial</div>
@@ -450,7 +450,7 @@ export const EventKitAndContentModule: React.FC<EventKitAndContentModuleProps> =
 
               {activeSubTab === 'folleto' && (
                 <div className="space-y-6">
-                  <div className="flex items-center justify-between pb-4 border-b border-black/5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-black/5">
                     <div>
                       <h3 className="text-base font-bold text-[#111111]">
                         Folleto Tríptico de Estadías & Residencias (Listo para Imprenta)
@@ -553,7 +553,7 @@ export const EventKitAndContentModule: React.FC<EventKitAndContentModuleProps> =
 
                   {/* Simulador del Formulario Móvil */}
                   <div className="lg:col-span-7 card-light p-7 rounded-[26px] space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-black/5">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 pb-3 border-b border-black/5">
                       <div>
                         <h4 className="font-bold text-sm text-[#111111]">
                           Simulador de Registro Móvil del Estudiante
@@ -587,7 +587,7 @@ export const EventKitAndContentModule: React.FC<EventKitAndContentModuleProps> =
                         />
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <label className="font-bold text-[#111111] block mb-1">Correo Institucional / Personal</label>
                           <input
@@ -668,7 +668,7 @@ export const EventKitAndContentModule: React.FC<EventKitAndContentModuleProps> =
             <>
               {activeSubTab === 'principal' && (
                 <div className="space-y-6">
-                  <div className="flex items-center justify-between pb-4 border-b border-black/5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-black/5">
                     <div>
                       <h3 className="text-base font-bold text-[#111111] flex items-center gap-2">
                         <Flame className="w-5 h-5 text-[#29008e]" />
@@ -818,7 +818,7 @@ export const EventKitAndContentModule: React.FC<EventKitAndContentModuleProps> =
             <>
               {activeSubTab === 'principal' && (
                 <div className="space-y-6">
-                  <div className="flex items-center justify-between pb-4 border-b border-black/5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-black/5">
                     <div>
                       <h3 className="text-base font-bold text-[#111111] flex items-center gap-2">
                         <Presentation className="w-5 h-5 text-[#0f094f]" />
@@ -837,8 +837,8 @@ export const EventKitAndContentModule: React.FC<EventKitAndContentModuleProps> =
                   </div>
 
                   {/* Diapositiva interactiva con Premium Dark Surface */}
-                  <div className="premium-dark-surface text-white p-8 sm:p-10 rounded-[28px] shadow-develop-modal border border-white/10 min-h-[400px] flex flex-col justify-between">
-                    <div className="flex items-center justify-between relative z-10">
+                  <div className="premium-dark-surface text-white p-5 sm:p-8 lg:p-10 rounded-[20px] sm:rounded-[28px] shadow-develop-modal border border-white/10 min-h-[320px] sm:min-h-[400px] flex flex-col justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-2 relative z-10">
                       <div className="flex items-center gap-2.5">
                         <span className="px-3 py-1 bg-white text-[#07052e] font-extrabold text-xs rounded-xl shadow-develop-glow">
                           DEVELOP
@@ -858,7 +858,7 @@ export const EventKitAndContentModule: React.FC<EventKitAndContentModuleProps> =
                       </p>
                     </div>
 
-                    <div className="flex items-center justify-between pt-4 border-t border-white/15 text-xs text-white/60 relative z-10">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pt-4 border-t border-white/15 text-xs text-white/60 relative z-10">
                       <span>Ponente: Lic. Carlos Mendoza · Develop</span>
                       <span>Sede: Auditorio de {company.name}</span>
                     </div>
@@ -868,7 +868,7 @@ export const EventKitAndContentModule: React.FC<EventKitAndContentModuleProps> =
 
               {activeSubTab === 'guion' && (
                 <div className="space-y-4 text-xs">
-                  <div className="flex items-center justify-between pb-3 border-b border-black/5">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 pb-3 border-b border-black/5">
                     <div>
                       <h3 className="font-bold text-sm text-[#111111] flex items-center gap-2">
                         <MessageSquareText className="w-4 h-4 text-[#29008e]" />

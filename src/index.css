@@ -55,7 +55,7 @@ body {
   border-image: linear-gradient(135deg, #a78bfa, #f472b6, #a78bfa) 1;
 }
 
-/* Superficie Dark Premium para Banners, CTAs, Hero y Footers */
+/* Superficie Dark Premium para Banners, CTAs, Hero, Sidebars y Footers */
 .premium-dark-surface {
   position: relative;
   isolation: isolate;
@@ -114,9 +114,9 @@ body {
   z-index: 0;
 }
 
-/* Cards Claras Oficiales */
+/* Cards Claras Oficiales (Guía §8) */
 .card-light {
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(0, 0, 0, 0.06);
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.05);
   backdrop-filter: blur(12px);
@@ -131,7 +131,7 @@ body {
   border-color: rgba(41, 0, 142, 0.15);
 }
 
-/* Cards Oscuras Glass */
+/* Cards Oscuras Glass (Guía §8) */
 .card-glass-dark {
   border: 1px solid rgba(255, 255, 255, 0.10);
   background: rgba(255, 255, 255, 0.06);
@@ -141,7 +141,7 @@ body {
   border-radius: 24px;
 }
 
-/* Botones Develop */
+/* Botones Develop (Guía §8) */
 .btn-primary-dark {
   background: #ffffff;
   color: #07052e;
@@ -196,14 +196,14 @@ body {
 
 .btn-outline-dark:hover {
   border-color: rgba(255, 255, 255, 0.50);
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
 }
 
-/* Badges / Pills */
+/* Badges / Pills (Guía §8) */
 .pill-dark {
   border: 1px solid rgba(255, 255, 255, 0.15);
   background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(255, 255, 255, 0.70);
   backdrop-filter: blur(12px);
   border-radius: 999px;
 }
@@ -224,7 +224,7 @@ body {
   border: 1px solid rgba(15, 9, 79, 0.08);
 }
 
-/* Icon Boxes */
+/* Icon Boxes (Guía §8) */
 .icon-box-gradient {
   background: linear-gradient(135deg, #0f094f, #640354, #29008e);
   color: #ffffff;
@@ -238,20 +238,20 @@ body {
   border-radius: 16px;
 }
 
-/* Formularios e Inputs */
+/* Formularios e Inputs (Guía §9) */
 .input-develop {
   background: #F8F8FC;
   border: 1px solid rgba(0, 0, 0, 0.10);
   color: #111111;
   border-radius: 12px;
-  padding: 0.625rem 0.875rem;
+  padding: 0.75rem 1rem;
   transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
 }
 
 .input-develop:focus {
   outline: none;
-  border-color: rgba(15, 9, 79, 0.35);
-  box-shadow: 0 0 0 2px rgba(15, 9, 79, 0.12);
+  border-color: rgba(15, 9, 79, 0.30);
+  box-shadow: 0 0 0 2px rgba(15, 9, 79, 0.10);
   transform: translateY(-1px);
 }
 
@@ -260,7 +260,7 @@ body {
   background: rgba(255, 255, 255, 0.075);
   color: rgba(255, 255, 255, 0.88);
   border-radius: 12px;
-  padding: 0.625rem 0.875rem;
+  padding: 0.75rem 1rem;
   transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
 }
 
@@ -272,16 +272,49 @@ body {
   transform: translateY(-1px);
 }
 
-/* Formulario Inmersivo / Premium */
+/* Formulario Inmersivo / Premium (Guía §9) */
 .form-glass-dark {
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 28px;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.055)),
-    rgba(7, 5, 46, 0.65);
+    rgba(7, 5, 46, 0.52);
   box-shadow: 0 32px 90px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
+}
+
+/* Animaciones (Guía §11) */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideRight {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slideRight {
+  animation: slideRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.ease-develop {
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Scrollbars sutiles */
@@ -300,6 +333,17 @@ body {
   background: #a78bfa;
 }
 
+/* Scrollbar dark para sidebar */
+.premium-dark-surface::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+}
+.premium-dark-surface::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+}
+.premium-dark-surface::-webkit-scrollbar-thumb:hover {
+  background: rgba(167, 139, 250, 0.4);
+}
+
 /* Leaflet fix */
 .leaflet-container {
   width: 100%;
@@ -307,7 +351,7 @@ body {
   z-index: 10;
 }
 
-/* Soporte de accesibilidad para movimiento reducido */
+/* Soporte de accesibilidad para movimiento reducido (Guía §11) */
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after {
     animation-duration: 0.01ms !important;
