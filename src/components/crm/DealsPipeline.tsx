@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Deal, Company, PipelineStage, ProjectModality, EventType } from '../../types';
+import { Deal, Company, PipelineStage, ProjectModality, EventType, Activity } from '../../types';
 import confetti from 'canvas-confetti';
 import { 
   Plus, 
@@ -16,8 +16,11 @@ import {
   Layers,
   Flag,
   Users,
-  X
+  X,
+  QrCode,
+  AlertTriangle
 } from 'lucide-react';
+import { actualizarEtapaOportunidad } from '../../services/servicioCrm';
 
 interface DealsPipelineProps {
   deals: Deal[];
@@ -26,6 +29,8 @@ interface DealsPipelineProps {
   onAddDeal: (newDeal: Omit<Deal, 'id' | 'createdAt'>) => void;
   onSelectSchoolForCRM?: (schoolId: string) => void;
   onOpenEventKit?: (dealId: string) => void;
+  onAddActivity?: (activity: Omit<Activity, 'id'>) => void;
+  onAbrirRegistroQr?: (dealId: string) => void;
 }
 
 // 6 etapas con colores armónicos alineados a la identidad visual Develop
@@ -44,13 +49,19 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
   onUpdateDealStage,
   onAddDeal,
   onSelectSchoolForCRM,
-  onOpenEventKit
+  onOpenEventKit,
+  onAddActivity,
+  onAbrirRegistroQr
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRep, setSelectedRep] = useState('todos');
   const [selectedModalityFilter, setSelectedModalityFilter] = useState<'todos' | ProjectModality>('todos');
   const [selectedEventTypeFilter, setSelectedEventTypeFilter] = useState<'todos' | EventType>('todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Estados para validaciones y notificaciones de avance
+  const [mensajeValidacion, setMensajeValidacion] = useState<string | null>(null);
+  const [alertaExito, setAlertaExito] = useState<{ titulo: string; mensaje: string } | null>(null);
 
   // Formulario nuevo trato / oportunidad
   const [newTitle, setNewTitle] = useState('');
@@ -88,14 +99,78 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
     .reduce((acc, d) => acc + d.amount, 0);
   const totalAlumnosCaptados = deals.reduce((sum, d) => sum + (d.registeredLeadsCount || 0), 0);
 
-  const handleStageChange = (dealId: string, currentStage: PipelineStage, targetStage: PipelineStage) => {
-    if (targetStage === 'resultado' && currentStage !== 'resultado') {
+  const handleStageChange = async (dealId: string, currentStage: PipelineStage, targetStage: PipelineStage) => {
+    const dealObjetivo = deals.find((d) => d.id === dealId);
+    if (!dealObjetivo) return;
+
+    setMensajeValidacion(null);
+
+    // Regla 1: Para mover a 'agendado': validar fecha asignada y modalidad definida (A o B)
+    if (targetStage === 'agendado') {
+      const tieneFecha = Boolean(dealObjetivo.expectedCloseDate && dealObjetivo.expectedCloseDate.trim() !== '');
+      const tieneModalidad =
+        dealObjetivo.projectModality === 'modalidad_a_programa' ||
+        dealObjetivo.projectModality === 'modalidad_b_escuela';
+
+      if (!tieneFecha || !tieneModalidad) {
+        setMensajeValidacion(
+          `Requisito de Salida: Para agendar "${dealObjetivo.title}" es obligatorio contar con una fecha tentativa asignada y tener definida la modalidad del proyecto (Modalidad A o Modalidad B).`
+        );
+        return;
+      }
+    }
+
+    // Regla 2: Para mover a 'resultado': verificar número de alumnos registrados y celebrar
+    if (targetStage === 'resultado') {
+      const alumnos = dealObjetivo.registeredLeadsCount || 0;
+
       confetti({
-        particleCount: 130,
-        spread: 85,
-        origin: { y: 0.6 }
+        particleCount: 150,
+        spread: 90,
+        origin: { y: 0.6 },
+        colors: ['#0f094f', '#640354', '#29008e', '#a78bfa', '#f472b6']
+      });
+
+      setAlertaExito({
+        titulo: `¡Convenio Concretado con Éxito!`,
+        mensaje: `"${dealObjetivo.title}" cerró favorablemente con ${alumnos} alumno(s) captados vía QR y una derrama de $${dealObjetivo.amount.toLocaleString('es-MX')} MXN.`
+      });
+
+      setTimeout(() => {
+        setAlertaExito(null);
+      }, 7000);
+    }
+
+    // Persistencia asíncrona en Supabase / Servicio CRM
+    actualizarEtapaOportunidad(dealId, targetStage as any).catch((err) =>
+      console.warn('Error actualizando etapa en el servicio central:', err)
+    );
+
+    // Regla 3: Registrar automáticamente actividad en la bitácora del CRM con el cambio de etapa
+    if (onAddActivity) {
+      const descripcion =
+        targetStage === 'agendado'
+          ? `Iniciativa AGENDADA para ${dealObjetivo.expectedCloseDate} en ${
+              dealObjetivo.projectModality === 'modalidad_a_programa'
+                ? 'Modalidad A (Programa)'
+                : 'Modalidad B (Alojado Escuela)'
+            }.`
+          : targetStage === 'resultado'
+          ? `RESULTADO Y ÉXITO FINAL: Alumnos registrados: ${dealObjetivo.registeredLeadsCount || 0}. Monto acordado: $${dealObjetivo.amount.toLocaleString('es-MX')} MXN.`
+          : `La oportunidad cambió de etapa: "${currentStage.toUpperCase()}" ➔ "${targetStage.toUpperCase()}". Responsable: ${dealObjetivo.assignedRep}.`;
+
+      onAddActivity({
+        companyId: dealObjetivo.companyId,
+        dealId: dealObjetivo.id,
+        type: 'task',
+        title: `Etapa Actualizada: ${targetStage.toUpperCase()}`,
+        description: descripcion,
+        date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        completed: true,
+        author: dealObjetivo.assignedRep
       });
     }
+
     onUpdateDealStage(dealId, targetStage);
   };
 
@@ -164,6 +239,44 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
           <span>Nueva Oportunidad</span>
         </button>
       </div>
+
+      {/* BANNER DE ERROR DE VALIDACIÓN DE SALIDA (REQUISITOS AGENDADO/RESULTADO) */}
+      {mensajeValidacion && (
+        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium flex items-start justify-between gap-3 shadow-xs animate-shake">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <strong className="font-bold text-amber-950 block mb-0.5">Validación de Transición de Etapa</strong>
+              <span>{mensajeValidacion}</span>
+            </div>
+          </div>
+          <button
+            onClick={() => setMensajeValidacion(null)}
+            className="text-amber-500 hover:text-amber-800 p-1"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* BANNER DE ÉXITO DE RESULTADO/CONVENIO CERRADO */}
+      {alertaExito && (
+        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-medium flex items-start justify-between gap-3 shadow-xs animate-fadeIn">
+          <div className="flex items-start gap-2.5">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+            <div>
+              <strong className="font-bold text-emerald-950 block mb-0.5">{alertaExito.titulo}</strong>
+              <span>{alertaExito.mensaje}</span>
+            </div>
+          </div>
+          <button
+            onClick={() => setAlertaExito(null)}
+            className="text-emerald-500 hover:text-emerald-800 p-1"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* METRICAS DEL DASHBOARD (GUÍA DEVELOP: CARDS CLARAS + 1 CARD DARK PREMIUM DESTACADA) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -469,6 +582,18 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                         >
                           <Sparkles className="w-3.5 h-3.5 text-[#29008e]" />
                           <span className="truncate">Ver Kit & Materiales ({deal.eventType.replace('_', ' ')})</span>
+                        </button>
+                      )}
+
+                      {/* Botón directo de Captura QR en Stand */}
+                      {onAbrirRegistroQr && (
+                        <button
+                          type="button"
+                          onClick={() => onAbrirRegistroQr(deal.id)}
+                          className="w-full mt-1.5 py-1.5 px-2 bg-[#640354]/10 hover:bg-[#640354]/15 text-[#640354] rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all border border-[#640354]/20 group-hover:border-[#640354]/30"
+                        >
+                          <QrCode className="w-3.5 h-3.5 text-[#640354]" />
+                          <span>Captura QR Alumnos ({deal.registeredLeadsCount || 0})</span>
                         </button>
                       )}
                     </div>

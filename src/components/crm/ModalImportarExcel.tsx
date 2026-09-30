@@ -437,7 +437,8 @@ export const ModalImportarExcel: React.FC<PropiedadesModalImportarExcel> = ({
                       </thead>
                       <tbody className="divide-y divide-black/5">
                         {universidadesFiltradas.map((item) => {
-                          const totalExtra = Object.keys(item.datos.datos_adicionales || {}).length;
+                          const datosExtra = (item.datos.datos_adicionales as Record<string, unknown>) || {};
+                          const totalExtra = Object.keys(datosExtra).length;
 
                           return (
                             <tr
@@ -489,7 +490,7 @@ export const ModalImportarExcel: React.FC<PropiedadesModalImportarExcel> = ({
 
                               {/* Matrícula */}
                               <td className="py-2 px-3 font-medium text-[#111111] whitespace-nowrap">
-                                {item.datos.matricula_estudiantes.toLocaleString('es-MX')}
+                                {(item.datos.matricula_estudiantes ?? 0).toLocaleString('es-MX')}
                               </td>
 
                               {/* Score */}
@@ -515,7 +516,7 @@ export const ModalImportarExcel: React.FC<PropiedadesModalImportarExcel> = ({
                               <td className="py-2 px-3 whitespace-nowrap">
                                 {totalExtra > 0 ? (
                                   <span
-                                    title={Object.entries(item.datos.datos_adicionales)
+                                    title={Object.entries(datosExtra)
                                       .map(([k, v]) => `${k}: ${v}`)
                                       .join('\n')}
                                     className="text-[10px] font-semibold bg-[#0f094f]/10 text-[#0f094f] px-2 py-0.5 rounded cursor-help"

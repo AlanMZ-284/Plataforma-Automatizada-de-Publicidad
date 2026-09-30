@@ -11,6 +11,7 @@ import { DealsPipeline } from './components/crm/DealsPipeline';
 import { CompaniesList } from './components/crm/CompaniesList';
 import { SchoolRoutePlanner } from './components/routes/SchoolRoutePlanner';
 import { EventKitAndContentModule } from './components/events-kit/EventKitAndContentModule';
+import { FormularioRegistroAlumnoQr } from './components/publico/FormularioRegistroAlumnoQr';
 import { 
   LayoutDashboard, 
   Building2, 
@@ -21,10 +22,10 @@ import {
   X,
   PanelLeftClose,
   PanelLeftOpen,
-  ChevronRight
+  QrCode
 } from 'lucide-react';
 
-type MainView = 'crm-pipeline' | 'crm-schools' | 'routes' | 'events-kit';
+type MainView = 'crm-pipeline' | 'crm-schools' | 'routes' | 'events-kit' | 'registro-alumno-qr';
 
 export function App() {
   const [currentView, setCurrentView] = useState<MainView>('crm-pipeline');
@@ -43,6 +44,24 @@ export function App() {
 
   // Estado para kit comercial activo seleccionado desde el CRM o directamente
   const [activeEventKitDealId, setActiveEventKitDealId] = useState<string | null>(deals[0]?.id || null);
+
+  // Estado para la oportunidad activa en el Formulario QR de captura de alumnos
+  const [activeQrDealId, setActiveQrDealId] = useState<string | null>(deals[0]?.id || null);
+
+  // Soporte para abrir directamente el formulario QR por URL (?vista=registro-alumno-qr&dealId=xxx)
+  React.useEffect(() => {
+    try {
+      const parametros = new URLSearchParams(window.location.search);
+      const vistaParam = parametros.get('vista');
+      const dealIdParam = parametros.get('dealId');
+      if (vistaParam === 'registro-alumno-qr') {
+        if (dealIdParam) setActiveQrDealId(dealIdParam);
+        setCurrentView('registro-alumno-qr');
+      }
+    } catch {
+      // Entorno sin window
+    }
+  }, []);
 
   // Actualizar etapa de un trato
   const handleUpdateDealStage = (dealId: string, newStage: PipelineStage) => {
@@ -166,6 +185,7 @@ export function App() {
     { id: 'crm-schools' as MainView, label: 'Directorio 360°', shortLabel: 'Directorio', icon: Building2 },
     { id: 'routes' as MainView, label: 'Rutas Logísticas', shortLabel: 'Rutas', icon: MapPin },
     { id: 'events-kit' as MainView, label: 'Kits & Contenidos IA', shortLabel: 'Kits IA', icon: Sparkles },
+    { id: 'registro-alumno-qr' as MainView, label: 'Captura QR en Stand', shortLabel: 'Captura QR', icon: QrCode }
   ];
 
   const currentNav = navItems.find((n) => n.id === currentView);
@@ -452,6 +472,11 @@ export function App() {
                 onAddDeal={handleAddDeal}
                 onSelectSchoolForCRM={handleOpenSchoolInCRM}
                 onOpenEventKit={handleOpenEventKit}
+                onAddActivity={handleAddActivity}
+                onAbrirRegistroQr={(dealId) => {
+                  setActiveQrDealId(dealId);
+                  setCurrentView('registro-alumno-qr');
+                }}
               />
             )}
 
@@ -487,6 +512,48 @@ export function App() {
                 onSelectSchoolForCRM={handleOpenSchoolInCRM}
               />
             )}
+
+            {currentView === 'registro-alumno-qr' && (() => {
+              const tratoActivo = deals.find((d) => d.id === activeQrDealId) || deals[0];
+              const universidadActiva = companies.find((c) => c.id === tratoActivo?.companyId);
+
+              return (
+                <div className="py-2 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-black/5 shadow-xs">
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-[#29008e]">
+                        Modo Stand de Vinculación Universitaria
+                      </div>
+                      <div className="text-xs text-[#555555] mt-0.5">
+                        Iniciativa activa:{' '}
+                        <strong className="text-[#0f094f]">{tratoActivo?.title}</strong> ({universidadActiva?.name})
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setCurrentView('crm-pipeline')}
+                        className="btn-secondary-light text-xs py-2 px-3.5 rounded-xl font-bold"
+                      >
+                        Volver al Pipeline
+                      </button>
+                    </div>
+                  </div>
+
+                  <FormularioRegistroAlumnoQr
+                    oportunidadId={tratoActivo?.id || ''}
+                    universidadId={tratoActivo?.companyId || ''}
+                    nombreUniversidad={universidadActiva?.name || 'Universidad Aliada'}
+                    tituloEvento={tratoActivo?.title || 'Feria de Empleo & Talento'}
+                    alRegistrarExitoso={() => {
+                      if (tratoActivo) {
+                        handleUpdateDealLeads(tratoActivo.id, (tratoActivo.registeredLeadsCount || 0) + 1);
+                      }
+                    }}
+                    alCerrarVista={() => setCurrentView('crm-pipeline')}
+                  />
+                </div>
+              );
+            })()}
           </main>
 
           {/* Footer Enterprise Develop Integrado al final del scroll */}

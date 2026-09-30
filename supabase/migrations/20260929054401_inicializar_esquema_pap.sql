@@ -50,7 +50,8 @@ CREATE TYPE tipo_actividad_crm AS ENUM (
     'reunion',
     'correo_electronico',
     'nota',
-    'tarea'
+    'tarea',
+    'alumno_qr_registrado'
 );
 
 CREATE TYPE estatus_ruta AS ENUM (

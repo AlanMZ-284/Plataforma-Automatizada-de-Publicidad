@@ -18,6 +18,7 @@ import {
   Trophy,
   UserCheck
 } from 'lucide-react';
+import { registrarAlumnoQr } from '../../services/servicioCrm';
 
 interface EventKitAndContentModuleProps {
   deals: Deal[];
@@ -82,6 +83,16 @@ export const EventKitAndContentModule: React.FC<EventKitAndContentModuleProps> =
     if (onUpdateDealLeads) {
       onUpdateDealLeads(activeDeal.id, currentCount + 1);
     }
+
+    registrarAlumnoQr({
+      oportunidad_id: activeDeal.id,
+      universidad_id: activeDeal.companyId,
+      nombre_completo: testStudentName.trim(),
+      correo_electronico: testStudentEmail.trim() || 'alumno@universidad.edu.mx',
+      carrera: testStudentCareer,
+      aviso_privacidad_aceptado: true
+    }).catch((err) => console.warn('Error sincronizando captura QR con el servicio:', err));
+
     setRegistrationSuccess(true);
     setTimeout(() => {
       setRegistrationSuccess(false);

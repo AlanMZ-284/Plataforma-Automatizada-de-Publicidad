@@ -488,7 +488,7 @@ export function procesarFilasConMapeo(
       modalidad_preferida: modalidad,
       etiquetas,
       marcas_aliadas: marcasAliadas,
-      datos_adicionales: datosAdicionales,
+      datos_adicionales: datosAdicionales as any,
       creado_en: ahoraIso,
       actualizado_en: ahoraIso
     };
@@ -529,12 +529,12 @@ export function transformarUniversidadACompania(universidad: Universidad): Compa
     phone: universidad.telefono || 'Sin teléfono',
     email: universidad.correo_electronico || 'vinculacion@universidad.edu.mx',
     directorName: universidad.director_nombre || 'Por confirmar',
-    studentCount: universidad.matricula_estudiantes,
-    monthlyTuition: Number(universidad.colegiatura_mensual),
-    leadScore: universidad.puntuacion_prioridad,
-    status: universidad.estatus,
-    tags: universidad.etiquetas.length > 0 ? universidad.etiquetas : ['Nuevo Ingreso Excel'],
-    preferredModality: universidad.modalidad_preferida,
-    alliedBrands: universidad.marcas_aliadas.length > 0 ? universidad.marcas_aliadas : ['Develop Academy']
+    studentCount: universidad.matricula_estudiantes ?? 0,
+    monthlyTuition: Number(universidad.colegiatura_mensual ?? 0),
+    leadScore: universidad.puntuacion_prioridad ?? 50,
+    status: universidad.estatus ?? 'prospecto',
+    tags: universidad.etiquetas && universidad.etiquetas.length > 0 ? universidad.etiquetas : ['Nuevo Ingreso Excel'],
+    preferredModality: (universidad.modalidad_preferida ?? 'modalidad_a_programa') as 'modalidad_a_programa' | 'modalidad_b_escuela',
+    alliedBrands: universidad.marcas_aliadas && universidad.marcas_aliadas.length > 0 ? universidad.marcas_aliadas : ['Develop Academy']
   };
 }
