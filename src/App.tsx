@@ -100,6 +100,11 @@ export function App() {
     setActivities((prev) => [newActivity, ...prev]);
   };
 
+  // Importar instituciones educativas desde Excel o CSV a la cartera activa
+  const handleImportCompanies = (newCompanies: Company[]) => {
+    setCompanies((prev) => [...newCompanies, ...prev]);
+  };
+
   // Registrar itinerario de ruta en el CRM
   const handleLogRouteToCRM = (trip: any) => {
     trip.stops.forEach((stop: any) => {
@@ -461,6 +466,7 @@ export function App() {
                 selectedCompanyId={selectedSchoolDetailId}
                 onCloseCompanyDetail={() => setSelectedSchoolDetailId(null)}
                 onOpenCompanyDetail={(id) => setSelectedSchoolDetailId(id)}
+                onImportCompanies={handleImportCompanies}
               />
             )}
 

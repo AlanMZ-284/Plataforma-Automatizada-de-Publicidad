@@ -10,15 +10,16 @@ import {
   Users, 
   Award, 
   Calendar, 
-  Clock, 
   Plus, 
   CheckCircle, 
   FileText,
   Navigation,
   X,
-  Sparkles,
-  Layers
+  FileSpreadsheet
 } from 'lucide-react';
+import { ModalImportarExcel } from './ModalImportarExcel';
+import { transformarUniversidadACompania } from '../../utils/lectorExcelUniversidades';
+import { Universidad } from '../../types/base_datos';
 
 interface CompaniesListProps {
   companies: Company[];
@@ -30,6 +31,7 @@ interface CompaniesListProps {
   selectedCompanyId?: string | null;
   onCloseCompanyDetail?: () => void;
   onOpenCompanyDetail?: (id: string) => void;
+  onImportCompanies?: (newCompanies: Company[]) => void;
 }
 
 export const CompaniesList: React.FC<CompaniesListProps> = ({
@@ -41,11 +43,16 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
   onNavigateToRoutePlanner,
   selectedCompanyId,
   onCloseCompanyDetail,
-  onOpenCompanyDetail
+  onOpenCompanyDetail,
+  onImportCompanies
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedState, setSelectedState] = useState<string>('todos');
   const [activeModalCompanyId, setActiveModalCompanyId] = useState<string | null>(selectedCompanyId || null);
+
+  // Estados para importación inteligente de Excel / CSV
+  const [modalImportarAbierto, setModalImportarAbierto] = useState(false);
+  const [mensajeExitoImportacion, setMensajeExitoImportacion] = useState<string | null>(null);
 
   // Estados para nuevo log de actividad
   const [activityType, setActivityType] = useState<'call' | 'meeting' | 'email' | 'note' | 'task'>('call');
@@ -58,6 +65,17 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
       setActiveModalCompanyId(selectedCompanyId);
     }
   }, [selectedCompanyId]);
+
+  const manejarImportacionUniversidades = (universidadesImportadas: Universidad[]) => {
+    const companiasTransformadas = universidadesImportadas.map(transformarUniversidadACompania);
+    if (onImportCompanies) {
+      onImportCompanies(companiasTransformadas);
+    }
+    setMensajeExitoImportacion(`¡Se importaron exitosamente ${companiasTransformadas.length} instituciones a la cartera comercial!`);
+    setTimeout(() => {
+      setMensajeExitoImportacion(null);
+    }, 6000);
+  };
 
   const filteredCompanies = companies.filter((c) => {
     const matchesSearch = 
@@ -113,10 +131,37 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
           </p>
         </div>
 
-        <div className="text-xs text-[#888888] font-medium">
-          Total: <strong className="text-[#0f094f] font-bold">{companies.length} instituciones</strong> en red
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <div className="text-xs text-[#888888] font-medium">
+            Total: <strong className="text-[#0f094f] font-bold">{companies.length} instituciones</strong> en red
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setModalImportarAbierto(true)}
+            className="btn-primary-develop text-xs px-3.5 py-2 rounded-xl font-bold flex items-center gap-2 shadow-develop-glow transition-all"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-[#a78bfa]" />
+            <span>Importar Excel / CSV</span>
+          </button>
         </div>
       </div>
+
+      {/* BANNER DE NOTIFICACIÓN DE IMPORTACIÓN EXITOSA */}
+      {mensajeExitoImportacion && (
+        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center justify-between shadow-sm animate-fadeIn">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{mensajeExitoImportacion}</span>
+          </div>
+          <button
+            onClick={() => setMensajeExitoImportacion(null)}
+            className="text-emerald-500 hover:text-emerald-700"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* CONTROLES DE FILTROS DEVELOP */}
       <div className="card-light p-4 flex flex-col md:flex-row items-center justify-between gap-4">
@@ -516,6 +561,13 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
           </div>
         </div>
       )}
+
+      {/* MODAL DE INGESTA INTELIGENTE DE EXCEL / CSV */}
+      <ModalImportarExcel
+        estaAbierto={modalImportarAbierto}
+        alCerrar={() => setModalImportarAbierto(false)}
+        alConfirmarImportacion={manejarImportacionUniversidades}
+      />
     </div>
   );
 };
