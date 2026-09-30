@@ -12,6 +12,9 @@ import { CompaniesList } from './components/crm/CompaniesList';
 import { SchoolRoutePlanner } from './components/routes/SchoolRoutePlanner';
 import { EventKitAndContentModule } from './components/events-kit/EventKitAndContentModule';
 import { FormularioRegistroAlumnoQr } from './components/publico/FormularioRegistroAlumnoQr';
+import { MarketingAutomationModule } from './components/marketing/MarketingAutomationModule';
+import { ExecutiveRoiDashboard } from './components/analytics/ExecutiveRoiDashboard';
+import { generarCampanaAutomaticaParaOportunidad } from './services/servicioMarketing';
 import { 
   LayoutDashboard, 
   Building2, 
@@ -22,10 +25,12 @@ import {
   X,
   PanelLeftClose,
   PanelLeftOpen,
-  QrCode
+  QrCode,
+  Share2,
+  BarChart3
 } from 'lucide-react';
 
-type MainView = 'crm-pipeline' | 'crm-schools' | 'routes' | 'events-kit' | 'registro-alumno-qr';
+type MainView = 'crm-pipeline' | 'crm-schools' | 'routes' | 'events-kit' | 'marketing' | 'analitica-roi' | 'registro-alumno-qr';
 
 export function App() {
   const [currentView, setCurrentView] = useState<MainView>('crm-pipeline');
@@ -101,6 +106,30 @@ export function App() {
         return deal;
       })
     );
+
+    // Disparador automático de Marketing: Al cambiar a 'agendado', generar automáticamente campaña multicanal
+    if (newStage === 'agendado') {
+      const dealObjetivo = deals.find((d) => d.id === dealId);
+      if (dealObjetivo) {
+        const compObjetivo = companies.find((c) => c.id === dealObjetivo.companyId);
+        const campanaGenerada = generarCampanaAutomaticaParaOportunidad(
+          { ...dealObjetivo, stage: 'agendado' },
+          compObjetivo
+        );
+
+        // Registrar actividad en la bitácora del CRM
+        handleAddActivity({
+          companyId: dealObjetivo.companyId,
+          dealId: dealObjetivo.id,
+          type: 'task',
+          title: `Campaña Multicanal Generada Automáticamente`,
+          description: `Oportunidad en etapa "Agendado". Se generó y programó la parrilla de difusión en LinkedIn, Instagram, TikTok y Meta con código QR de registro (${campanaGenerada.publicaciones.length} publicaciones). Presupuesto de difusión: $${campanaGenerada.presupuestoMxn.toLocaleString('es-MX')} MXN.`,
+          date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+          completed: true,
+          author: 'Automatización de Marketing PAP'
+        });
+      }
+    }
   };
 
   // Agregar nuevo trato
@@ -219,6 +248,8 @@ export function App() {
     { id: 'crm-schools' as MainView, label: 'Directorio 360°', shortLabel: 'Directorio', icon: Building2 },
     { id: 'routes' as MainView, label: 'Rutas Logísticas', shortLabel: 'Rutas', icon: MapPin },
     { id: 'events-kit' as MainView, label: 'Kits & Contenidos IA', shortLabel: 'Kits IA', icon: Sparkles },
+    { id: 'marketing' as MainView, label: 'Marketing Multicanal', shortLabel: 'Marketing', icon: Share2 },
+    { id: 'analitica-roi' as MainView, label: 'Tablero ROI & Analítica', shortLabel: 'ROI & KPIs', icon: BarChart3 },
     { id: 'registro-alumno-qr' as MainView, label: 'Captura QR en Stand', shortLabel: 'Captura QR', icon: QrCode }
   ];
 
@@ -544,6 +575,26 @@ export function App() {
                 selectedDealId={activeEventKitDealId}
                 onUpdateDealLeads={handleUpdateDealLeads}
                 onSelectSchoolForCRM={handleOpenSchoolInCRM}
+              />
+            )}
+
+            {currentView === 'marketing' && (
+              <MarketingAutomationModule
+                deals={deals}
+                companies={companies}
+                onNavigateToDeal={(dealId) => {
+                  setActiveEventKitDealId(dealId);
+                  setCurrentView('events-kit');
+                }}
+              />
+            )}
+
+            {currentView === 'analitica-roi' && (
+              <ExecutiveRoiDashboard
+                deals={deals}
+                companies={companies}
+                onNavigateToPipeline={() => setCurrentView('crm-pipeline')}
+                onNavigateToRoutes={() => setCurrentView('routes')}
               />
             )}
 
