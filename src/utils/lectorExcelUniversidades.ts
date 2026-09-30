@@ -465,9 +465,13 @@ export function procesarFilasConMapeo(
       estadoValidacion = 'con_advertencias';
     }
 
-    // Construcción de la entidad canónica Universidad
+    // Construcción de la entidad canónica Universidad (con UUID válido)
+    const idUniversidadValido = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : '00000000-0000-4000-8000-' + String(Date.now()).padStart(12, '0');
+
     const entidadUniversidad: Universidad = {
-      id: `uni-${Date.now()}-${indice + 1}`,
+      id: idUniversidadValido,
       clave_cct: claveCct,
       nombre: nombreCrudo || `Institución Fila ${indice + 1} (Sin Nombre)`,
       tipo,

@@ -13,13 +13,18 @@ import {
   OportunidadInsercion,
   EtapaOportunidad,
   ProspectoAlumnoInsercion,
-  ActividadCrmInsercion
+  ActividadCrmInsercion,
+  RecorridoRuta,
+  RecorridoRutaInsercion
 } from '../types/base_datos';
 import { SEED_DEALS, SEED_COMPANIES } from '../data/seedData';
+import { RecorridoOptimizado } from '../utils/optimizadorRutas';
 
 const CLAVE_ALMACENAMIENTO_OPORTUNIDADES = 'pap_crm_oportunidades_local';
 const CLAVE_ALMACENAMIENTO_ALUMNOS = 'pap_crm_alumnos_local';
 const CLAVE_ALMACENAMIENTO_ACTIVIDADES = 'pap_crm_actividades_local';
+const CLAVE_ALMACENAMIENTO_RECORRIDOS = 'pap_crm_recorridos_local';
+const CLAVE_ALMACENAMIENTO_UNIVERSIDADES = 'pap_crm_universidades_local';
 
 /**
  * Convierte un Deal del prototipo frontend inicial al formato canónico oficial de Oportunidad.
@@ -317,4 +322,184 @@ export async function registrarAlumnoQr(lead: ParametrosRegistroAlumnoQr): Promi
 export function obtenerNombreUniversidad(universidadId: string): string {
   const encontrada = SEED_COMPANIES.find((c) => c.id === universidadId);
   return encontrada ? encontrada.name : 'Universidad Aliada';
+}
+
+/**
+ * Resultado de la operación de guardar un recorrido logístico en la agenda del CRM.
+ */
+export interface ResultadoGuardadoRecorrido {
+  recorridoId: string;
+  enlaceGoogleMaps: string;
+  totalParadas: number;
+  totalViaticosMxn: number;
+  actividadesGeneradas: {
+    id: string;
+    companyId: string;
+    universidad_id: string;
+    type: 'meeting';
+    tipo: 'reunion';
+    title: string;
+    titulo: string;
+    description: string;
+    descripcion: string;
+    date: string;
+    fecha: string;
+    completed: boolean;
+    completada: boolean;
+    author: string;
+    autor: string;
+  }[];
+}
+
+/**
+ * Guarda y agenda un recorrido logístico completo en el CRM de Develop:
+ * 1. Para cada universidad de la ruta, genera una actividad de tipo 'reunion' en la bitácora del CRM.
+ * 2. Persiste el recorrido en la tabla 'recorridos_rutas' de Supabase con el JSON de paradas y viáticos.
+ * 3. Almacena en localStorage como respaldo offline asegurando disponibilidad inmediata.
+ */
+export async function guardarRecorridoRuta(
+  recorrido: RecorridoOptimizado,
+  fechaGira?: string,
+  asesorResponsable: string = 'Carlos Mendoza'
+): Promise<ResultadoGuardadoRecorrido> {
+  const ahoraIso = new Date().toISOString();
+  const fechaGiraDefinida = fechaGira || ahoraIso.split('T')[0];
+
+  // Generar un ID UUID válido para PostgreSQL
+  const idRecorrido = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : '00000000-0000-4000-8000-' + String(Date.now()).padStart(12, '0');
+
+  // 1. Generar actividades de tipo 'reunion' para cada universidad en el circuito
+  const actividadesGeneradas = recorrido.paradas.map((parada) => {
+    const idActividad = `act-gira-${Date.now()}-${parada.orden}`;
+    const horaTexto = parada.hora_reunion_recomendada || '09:00 hrs';
+    const contactoTexto = parada.director_nombre || 'Director(a) de Vinculación';
+    const totalViaticosFormato = recorrido.viaticos.total_viaticos_mxn.toLocaleString('es-MX');
+
+    const tituloActividad = `Visita Presencial Agendada en Gira: ${parada.nombre}`;
+    const descripcionActividad = `Llegada recomendada: ${horaTexto}. Reunión con ${contactoTexto}. Viáticos autorizados para la gira: $${totalViaticosFormato} MXN.`;
+    const fechaHora = `${fechaGiraDefinida} ${horaTexto.replace(' hrs', '')}`;
+
+    return {
+      id: idActividad,
+      companyId: parada.universidad_id,
+      universidad_id: parada.universidad_id,
+      type: 'meeting' as const,
+      tipo: 'reunion' as const,
+      title: tituloActividad,
+      titulo: tituloActividad,
+      description: descripcionActividad,
+      descripcion: descripcionActividad,
+      date: fechaHora,
+      fecha: fechaHora,
+      completed: false,
+      completada: false,
+      author: asesorResponsable,
+      autor: asesorResponsable
+    };
+  });
+
+  // 2. Persistir en Supabase (si hay conexión local disponible)
+  try {
+    const conexionDisponible = await verificarConexionSupabase();
+
+    if (conexionDisponible) {
+      const insercionRecorrido: RecorridoRutaInsercion = {
+        id: idRecorrido,
+        titulo: recorrido.titulo,
+        asesor_responsable: asesorResponsable,
+        fecha_inicio: fechaGiraDefinida,
+        fecha_fin: fechaGiraDefinida,
+        origen_nombre: recorrido.origen.nombre,
+        origen_direccion: recorrido.origen.direccion,
+        origen_latitud: recorrido.origen.lat,
+        origen_longitud: recorrido.origen.lng,
+        filtro_estado: recorrido.filtro_estado,
+        distancia_total_km: recorrido.distancia_total_km,
+        minutos_conduccion_total: recorrido.minutos_conduccion_total,
+        minutos_estimados_totales: recorrido.minutos_estimados_totales,
+        porcentaje_ganancia_eficiencia: recorrido.porcentaje_ganancia_eficiencia,
+        presupuesto_gasolina_mxn: recorrido.viaticos.gasolina_mxn,
+        presupuesto_casetas_mxn: recorrido.viaticos.casetas_mxn,
+        presupuesto_alimentos_mxn: recorrido.viaticos.alimentos_mxn,
+        total_viaticos_mxn: recorrido.viaticos.total_viaticos_mxn,
+        estimacion_litros_combustible: recorrido.viaticos.estimacion_litros_combustible,
+        estimacion_dias: recorrido.viaticos.estimacion_dias,
+        enlace_google_maps: recorrido.enlace_google_maps,
+        estatus: 'planificada',
+        datos_adicionales: {
+          paradas: recorrido.paradas,
+          viaticos: recorrido.viaticos
+        } as unknown as import('../types/base_datos_supabase').Json
+      };
+
+      await clienteSupabase.from('recorridos_rutas').insert(insercionRecorrido);
+    }
+  } catch (error) {
+    console.warn('Fallo guardando recorrido en Supabase; persistiendo en almacenamiento local.', error);
+  }
+
+  // 3. Persistir en almacenamiento local (recorridos y actividades de agenda)
+  try {
+    const recorridosPrevios = JSON.parse(localStorage.getItem(CLAVE_ALMACENAMIENTO_RECORRIDOS) || '[]');
+    const nuevoRegistroRecorrido = {
+      ...recorrido,
+      id: idRecorrido,
+      fecha_gira: fechaGiraDefinida,
+      asesor_responsable: asesorResponsable,
+      guardado_en: ahoraIso
+    };
+    localStorage.setItem(
+      CLAVE_ALMACENAMIENTO_RECORRIDOS,
+      JSON.stringify([nuevoRegistroRecorrido, ...recorridosPrevios])
+    );
+
+    const actividadesPrevias = JSON.parse(localStorage.getItem(CLAVE_ALMACENAMIENTO_ACTIVIDADES) || '[]');
+    localStorage.setItem(
+      CLAVE_ALMACENAMIENTO_ACTIVIDADES,
+      JSON.stringify([...actividadesGeneradas, ...actividadesPrevias])
+    );
+  } catch (error) {
+    console.warn('Error guardando en almacenamiento local:', error);
+  }
+
+  return {
+    recorridoId: idRecorrido,
+    enlaceGoogleMaps: recorrido.enlace_google_maps,
+    totalParadas: recorrido.paradas.length,
+    totalViaticosMxn: recorrido.viaticos.total_viaticos_mxn,
+    actividadesGeneradas
+  };
+}
+
+/**
+ * Consulta la lista de recorridos guardados previamente en el sistema.
+ */
+export async function obtenerRecorridosGuardados(): Promise<any[]> {
+  try {
+    const conexionDisponible = await verificarConexionSupabase();
+
+    if (conexionDisponible) {
+      const { data, error } = await clienteSupabase
+        .from('recorridos_rutas')
+        .select('*')
+        .order('creado_en', { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        return data;
+      }
+    }
+  } catch (error) {
+    console.warn('No fue posible consultar recorridos de Supabase; recurriendo al local.', error);
+  }
+
+  try {
+    const locales = localStorage.getItem(CLAVE_ALMACENAMIENTO_RECORRIDOS);
+    if (locales) return JSON.parse(locales);
+  } catch (e) {
+    console.warn('Error leyendo recorridos locales:', e);
+  }
+
+  return [];
 }

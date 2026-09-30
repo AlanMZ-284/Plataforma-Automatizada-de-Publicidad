@@ -32,8 +32,24 @@ export function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
-  // Estados de datos en memoria reactivos
-  const [companies, setCompanies] = useState<Company[]>(SEED_COMPANIES);
+  // Estados de datos en memoria reactivos con persistencia resiliente
+  const [companies, setCompanies] = useState<Company[]>(() => {
+    try {
+      const guardadas = localStorage.getItem('pap_crm_universidades_local');
+      if (guardadas) {
+        const parsed = JSON.parse(guardadas);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const idsExistentes = new Set(parsed.map((p: any) => p.id));
+          const faltantes = SEED_COMPANIES.filter((s) => !idsExistentes.has(s.id));
+          return [...parsed, ...faltantes];
+        }
+      }
+    } catch (e) {
+      console.warn('Error cargando universidades locales:', e);
+    }
+    return SEED_COMPANIES;
+  });
+
   const [contacts, setContacts] = useState<Contact[]>(SEED_CONTACTS);
   const [deals, setDeals] = useState<Deal[]>(SEED_DEALS);
   const [activities, setActivities] = useState<Activity[]>(SEED_ACTIVITIES);
@@ -121,20 +137,38 @@ export function App() {
 
   // Importar instituciones educativas desde Excel o CSV a la cartera activa
   const handleImportCompanies = (newCompanies: Company[]) => {
-    setCompanies((prev) => [...newCompanies, ...prev]);
+    setCompanies((prev) => {
+      const actualizadas = [...newCompanies, ...prev];
+      try {
+        localStorage.setItem('pap_crm_universidades_local', JSON.stringify(actualizadas));
+      } catch (e) {
+        console.warn('Error guardando universidades en localStorage:', e);
+      }
+      return actualizadas;
+    });
   };
 
-  // Registrar itinerario de ruta en el CRM
-  const handleLogRouteToCRM = (trip: any) => {
-    trip.stops.forEach((stop: any) => {
+  // Registrar itinerario de ruta y viáticos en la agenda del CRM
+  const handleLogRouteToCRM = (trip: any, fechaGira?: string, asesor?: string) => {
+    const paradas = trip.paradas || trip.stops || [];
+    const fechaBase = fechaGira || new Date().toISOString().split('T')[0];
+    const totalViaticos = (trip.viaticos?.total_viaticos_mxn ?? trip.viaticos?.totalViaticosMxn ?? 0).toLocaleString('es-MX');
+    const autorAsesor = asesor || 'Carlos Mendoza';
+
+    paradas.forEach((stop: any) => {
+      const escuelaId = stop.universidad_id || stop.schoolId;
+      const nombreEscuela = stop.nombre || stop.name;
+      const horaLlegada = stop.hora_reunion_recomendada || stop.recommendedMeetingHour || '09:00 hrs';
+      const director = stop.director_nombre || stop.directorName || 'Director(a) de Vinculación';
+
       handleAddActivity({
-        companyId: stop.schoolId,
+        companyId: escuelaId,
         type: 'meeting',
-        title: `Visita Presencial Agendada en Ruta: ${stop.name}`,
-        description: `Llegada estimada a las ${stop.recommendedMeetingHour} para reunión con ${stop.directorName}. Viáticos autorizados: $${trip.viaticos.totalViaticosMxn} MXN.`,
-        date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        title: `Visita Presencial Agendada en Gira: ${nombreEscuela}`,
+        description: `Llegada recomendada: ${horaLlegada}. Reunión con ${director}. Viáticos autorizados para la gira: $${totalViaticos} MXN.`,
+        date: `${fechaBase} ${horaLlegada.replace(' hrs', '')}`,
         completed: false,
-        author: 'Carlos Mendoza'
+        author: autorAsesor
       });
     });
   };

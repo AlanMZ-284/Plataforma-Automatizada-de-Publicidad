@@ -1,6 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { Company, OptimizedTrip } from '../../types';
-import { solveOptimalRoute, generateGoogleMapsUrl } from '../../utils/routeOptimizer';
+import { Company } from '../../types';
+import {
+  resolverCircuitoOptimoTsp,
+  generarEnlaceGoogleMaps,
+  PUNTOS_ORIGEN_CDMX,
+  RecorridoOptimizado
+} from '../../utils/optimizadorRutas';
+import { guardarRecorridoRuta, ResultadoGuardadoRecorrido } from '../../services/servicioCrm';
 import { RouteMap } from './RouteMap';
 import { 
   Navigation, 
@@ -20,41 +26,16 @@ import {
   Receipt,
   Utensils,
   CheckCircle2,
-  Car
+  Car,
+  Search,
+  FileSpreadsheet
 } from 'lucide-react';
 
 interface SchoolRoutePlannerProps {
   schools: Company[];
   onSelectSchoolForCRM?: (schoolId: string) => void;
-  onLogRouteToCRM?: (trip: OptimizedTrip) => void;
+  onLogRouteToCRM?: (trip: any, fechaGira?: string, asesor?: string) => void;
 }
-
-const CDMX_ORIGIN_OPTIONS = [
-  {
-    name: 'CDMX - Paseo de la Reforma (Ángel de la Independencia)',
-    address: 'Paseo de la Reforma s/n, Juárez, Cuauhtémoc, CDMX',
-    lat: 19.4270,
-    lng: -99.1677
-  },
-  {
-    name: 'CDMX - Insurgentes Sur (Col. Del Valle / Mixcoac)',
-    address: 'Av. Insurgentes Sur 1200, Benito Juárez, CDMX',
-    lat: 19.3780,
-    lng: -99.1785
-  },
-  {
-    name: 'CDMX - Polanco (Miguel Hidalgo)',
-    address: 'Av. Pdte. Masaryk 111, Polanco, CDMX',
-    lat: 19.4326,
-    lng: -99.1915
-  },
-  {
-    name: 'CDMX - Centro Histórico (Zócalo)',
-    address: 'Plaza de la Constitución s/n, Centro, CDMX',
-    lat: 19.4326,
-    lng: -99.1332
-  }
-];
 
 export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
   schools,
@@ -63,28 +44,55 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
 }) => {
   const [selectedOriginIndex, setSelectedOriginIndex] = useState<number>(0);
   const [filterState, setFilterState] = useState<string>('Estado de México');
+  const [searchTerm, setSearchTerm] = useState<string>('');
   
-  // Por defecto, universidades del Estado de México para la ruta inicial
-  const [selectedSchoolIds, setSelectedSchoolIds] = useState<string[]>(() => {
-    return schools
-      .filter((s) => s.state === 'Estado de México')
-      .map((s) => s.id);
+  // Fecha seleccionada para la gira (por defecto mañana o fecha actual)
+  const [fechaGira, setFechaGira] = useState<string>(() => {
+    const manana = new Date();
+    manana.setDate(manana.getDate() + 1);
+    return manana.toISOString().split('T')[0];
   });
 
-  const [optimizedTrip, setOptimizedTrip] = useState<OptimizedTrip | null>(() => {
-    const origin = CDMX_ORIGIN_OPTIONS[0];
-    const initialSchools = schools.filter((s) => s.state === 'Estado de México');
-    return solveOptimalRoute(origin, initialSchools, 'Estado de México');
+  const [asesorResponsable, setAsesorResponsable] = useState<string>('Carlos Mendoza');
+
+  // Identificar si una escuela fue importada desde archivo Excel o CSV
+  const esEscuelaImportada = (escuela: Company): boolean => {
+    return (
+      (escuela.tags && escuela.tags.some((t) => t.toLowerCase().includes('excel') || t.toLowerCase().includes('importad'))) ||
+      escuela.id.startsWith('uni-') ||
+      (!escuela.id.startsWith('school-mex-') && !escuela.id.startsWith('school-cdmx-'))
+    );
+  };
+
+  // Por defecto, universidades del Estado de México para la ruta inicial
+  const [selectedSchoolIds, setSelectedSchoolIds] = useState<string[]>(() => {
+    const iniciales = schools.filter((s) => s.state === 'Estado de México').map((s) => s.id);
+    return iniciales.length > 0 ? iniciales : schools.slice(0, 5).map((s) => s.id);
+  });
+
+  const [recorridoActual, setRecorridoActual] = useState<RecorridoOptimizado | null>(() => {
+    const origen = PUNTOS_ORIGEN_CDMX[0];
+    const escuelasIniciales = schools.filter((s) => s.state === 'Estado de México');
+    return resolverCircuitoOptimoTsp(origen, escuelasIniciales, 'Estado de México');
   });
 
   const [isCalculating, setIsCalculating] = useState<boolean>(false);
-  const [routeSavedInCRM, setRouteSavedInCRM] = useState<boolean>(false);
+  const [guardandoEnCrm, setGuardandoEnCrm] = useState<boolean>(false);
+  const [resultadoGuardado, setResultadoGuardado] = useState<ResultadoGuardadoRecorrido | null>(null);
 
-  // Filtrado de lista según estado
+  // Filtrado de lista según estado y término de búsqueda
   const filteredSchools = useMemo(() => {
-    if (filterState === 'Todas') return schools;
-    return schools.filter((s) => s.state === filterState);
-  }, [schools, filterState]);
+    return schools.filter((s) => {
+      const coincideEstado = filterState === 'Todas' || s.state === filterState;
+      const coincideBusqueda = 
+        !searchTerm.trim() ||
+        s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.municipality.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.directorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (s.tags && s.tags.some((t) => t.toLowerCase().includes(searchTerm.toLowerCase())));
+      return coincideEstado && coincideBusqueda;
+    });
+  }, [schools, filterState, searchTerm]);
 
   const toggleSelectSchool = (id: string) => {
     setSelectedSchoolIds((prev) =>
@@ -104,25 +112,40 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
 
   const handleComputeRoute = () => {
     setIsCalculating(true);
-    setRouteSavedInCRM(false);
+    setResultadoGuardado(null);
     setTimeout(() => {
-      const origin = CDMX_ORIGIN_OPTIONS[selectedOriginIndex];
-      const targetSchools = schools.filter((s) => selectedSchoolIds.includes(s.id));
-      const trip = solveOptimalRoute(origin, targetSchools, filterState);
-      setOptimizedTrip(trip);
+      const origen = PUNTOS_ORIGEN_CDMX[selectedOriginIndex];
+      const escuelasSeleccionadas = schools.filter((s) => selectedSchoolIds.includes(s.id));
+      const nuevoRecorrido = resolverCircuitoOptimoTsp(origen, escuelasSeleccionadas, filterState);
+      setRecorridoActual(nuevoRecorrido);
       setIsCalculating(false);
-    }, 450);
+    }, 400);
   };
 
-  const handleSaveToCRM = () => {
-    if (optimizedTrip && onLogRouteToCRM) {
-      onLogRouteToCRM(optimizedTrip);
+  const handleSaveToCRM = async () => {
+    if (!recorridoActual) return;
+    setGuardandoEnCrm(true);
+
+    try {
+      // 1. Guardar en persistencia central (Supabase + localStorage)
+      const resultado = await guardarRecorridoRuta(recorridoActual, fechaGira, asesorResponsable);
+      setResultadoGuardado(resultado);
+
+      // 2. Notificar al manejador de la aplicación principal para reactividad instantánea
+      if (onLogRouteToCRM) {
+        onLogRouteToCRM(recorridoActual, fechaGira, asesorResponsable);
+      }
+    } catch (error) {
+      console.error('Error al guardar recorrido en CRM:', error);
+    } finally {
+      setGuardandoEnCrm(false);
     }
-    setRouteSavedInCRM(true);
-    setTimeout(() => setRouteSavedInCRM(false), 4000);
   };
 
-  const googleMapsUrl = optimizedTrip ? generateGoogleMapsUrl(optimizedTrip) : '';
+  const googleMapsUrl = recorridoActual ? generarEnlaceGoogleMaps(recorridoActual.origen, recorridoActual.paradas) : '';
+
+  // Cantidad de escuelas importadas disponibles en el catálogo
+  const totalImportadas = useMemo(() => schools.filter(esEscuelaImportada).length, [schools]);
 
   return (
     <div className="space-y-7">
@@ -138,31 +161,54 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
               Planificador de Rutas Universitarias & <span className="gradient-text">Control de Viáticos</span>
             </h1>
             <p className="text-white/70 text-xs lg:text-sm leading-relaxed">
-              Algoritmo de optimización de traslados: genera circuitos cerrados sin trayectorias repetidas, agenda sincronizada con directores y cotizador de viáticos (gasolina, casetas y alimentos) listo para autorización de dirección comercial.
+              Algoritmo 2-Opt TSP con restricción de circuito cerrado (origen CDMX ➔ escuelas seleccionadas ➔ retorno base).
+              Integrado con el catálogo escolar oficial (incluyendo planteles importados vía Excel) y sincronización directa con la agenda del CRM.
             </p>
           </div>
 
-          {optimizedTrip && (
+          {recorridoActual && (
             <div className="card-glass-dark p-3.5 sm:px-6 sm:py-4 rounded-2xl flex items-center gap-3 sm:gap-4 text-left border border-white/20 shrink-0">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-[#29008e] to-[#f472b6] flex items-center justify-center font-bold text-white shadow-develop-box">
                 <TrendingUp className="w-6 h-6" />
               </div>
               <div>
                 <div className="text-[10px] uppercase text-white/60 font-bold tracking-wider">Eficiencia Logística</div>
-                <div className="text-2xl font-black gradient-text">+{optimizedTrip.efficiencyGainPct}%</div>
-                <div className="text-xs text-[#a78bfa] font-medium">Ahorro vs. ruta no ordenada</div>
+                <div className="text-2xl font-black gradient-text">+{recorridoActual.porcentaje_ganancia_eficiencia}%</div>
+                <div className="text-xs text-[#a78bfa] font-medium">Ahorro vs. ruta desordenada</div>
               </div>
             </div>
           )}
         </div>
       </div>
 
-      {routeSavedInCRM && (
-        <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 p-4 rounded-2xl flex items-center gap-3 text-xs font-semibold shadow-xs animate-fadeIn">
-          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-          <span>
-            ¡Itinerario de visitas y presupuesto de viáticos guardados exitosamente en la agenda del CRM de Develop!
-          </span>
+      {/* NOTIFICACIÓN DE ÉXITO AL GUARDAR EN AGENDA CRM */}
+      {resultadoGuardado && (
+        <div className="bg-emerald-50 border border-emerald-300 text-emerald-950 p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs animate-fadeIn">
+          <div className="flex items-start sm:items-center gap-3">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5 sm:mt-0" />
+            <div>
+              <div className="font-bold text-xs sm:text-sm text-emerald-900">
+                ¡Gira agendada exitosamente en el CRM de Develop!
+              </div>
+              <div className="text-[11px] sm:text-xs text-emerald-800 mt-0.5">
+                Se registraron <strong>{resultadoGuardado.totalParadas} reuniones presenciales</strong> para el día{' '}
+                <strong>{fechaGira}</strong> a cargo de <strong>{asesorResponsable}</strong> con un presupuesto de viáticos autorizado de{' '}
+                <strong>${resultadoGuardado.totalViaticosMxn.toLocaleString('es-MX')} MXN</strong>.
+              </div>
+            </div>
+          </div>
+
+          {resultadoGuardado.enlaceGoogleMaps && (
+            <a
+              href={resultadoGuardado.enlaceGoogleMaps}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-primary-develop px-3.5 py-2 text-xs font-bold flex items-center gap-1.5 shrink-0 self-start sm:self-auto shadow-xs"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-[#a78bfa]" />
+              Abrir Itinerario en Google Maps
+            </a>
+          )}
         </div>
       )}
 
@@ -170,12 +216,20 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Columna Izquierda: Parámetros y Selector de Universidades (4 Columnas) */}
         <div className="lg:col-span-4 card-light p-4 sm:p-6 rounded-[24px] space-y-5">
-          <div className="pb-3 border-b border-black/5">
-            <h3 className="font-bold text-[#111111] flex items-center gap-2 text-base">
-              <Navigation className="w-4 h-4 text-[#0f094f]" />
-              Parámetros de la Jornada
-            </h3>
-            <p className="text-xs text-[#555555] mt-0.5">Configura punto base y sedes a visitar</p>
+          <div className="pb-3 border-b border-black/5 flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-[#111111] flex items-center gap-2 text-base">
+                <Navigation className="w-4 h-4 text-[#0f094f]" />
+                Parámetros de la Jornada
+              </h3>
+              <p className="text-xs text-[#555555] mt-0.5">Configura punto base, fecha y sedes</p>
+            </div>
+            {totalImportadas > 0 && (
+              <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full flex items-center gap-1">
+                <FileSpreadsheet className="w-3 h-3 text-emerald-600" />
+                {totalImportadas} de Excel
+              </span>
+            )}
           </div>
 
           {/* Selector de Origen (CDMX) */}
@@ -188,12 +242,40 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
               onChange={(e) => setSelectedOriginIndex(Number(e.target.value))}
               className="input-develop w-full text-xs font-medium text-[#111111]"
             >
-              {CDMX_ORIGIN_OPTIONS.map((opt, idx) => (
+              {PUNTOS_ORIGEN_CDMX.map((opt, idx) => (
                 <option key={idx} value={idx}>
-                  {opt.name}
+                  {opt.nombre}
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Fecha de Gira y Asesor Responsable */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-[#111111] uppercase tracking-wider block">
+                Fecha de la Gira
+              </label>
+              <input
+                type="date"
+                value={fechaGira}
+                onChange={(e) => setFechaGira(e.target.value)}
+                className="input-develop w-full text-xs font-medium text-[#111111]"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-[#111111] uppercase tracking-wider block">
+                Asesor en Campo
+              </label>
+              <input
+                type="text"
+                value={asesorResponsable}
+                onChange={(e) => setAsesorResponsable(e.target.value)}
+                className="input-develop w-full text-xs font-medium text-[#111111]"
+                placeholder="Nombre del asesor"
+              />
+            </div>
           </div>
 
           {/* Filtro por Estado */}
@@ -218,6 +300,20 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
             </div>
           </div>
 
+          {/* Búsqueda rápida de universidades */}
+          <div className="space-y-1.5">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#888888]" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Buscar campus o municipio..."
+                className="input-develop w-full pl-8 text-xs text-[#111111]"
+              />
+            </div>
+          </div>
+
           {/* Selector de Universidades */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
@@ -229,7 +325,7 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
                   onClick={selectAllFiltered}
                   className="text-xs text-[#29008e] hover:underline font-bold"
                 >
-                  Todas
+                  Todas ({filteredSchools.length})
                 </button>
                 <span className="text-black/20">|</span>
                 <button
@@ -241,45 +337,60 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
               </div>
             </div>
 
-            <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1 border border-black/5 rounded-2xl p-2 bg-[#F8F8FC]">
-              {filteredSchools.map((school) => {
-                const isSelected = selectedSchoolIds.includes(school.id);
-                return (
-                  <div
-                    key={school.id}
-                    onClick={() => toggleSelectSchool(school.id)}
-                    className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex items-start gap-3 ${
-                      isSelected
-                        ? 'bg-white border-[#29008e]/30 shadow-xs'
-                        : 'bg-white/60 border-black/5 hover:border-black/10'
-                    }`}
-                  >
-                    <div className="mt-0.5">
-                      {isSelected ? (
-                        <CheckSquare className="w-4 h-4 text-[#29008e]" />
-                      ) : (
-                        <Square className="w-4 h-4 text-[#888888]" />
-                      )}
+            <div className="max-h-[290px] overflow-y-auto space-y-2 pr-1 border border-black/5 rounded-2xl p-2 bg-[#F8F8FC]">
+              {filteredSchools.length === 0 ? (
+                <div className="text-center py-6 text-xs text-[#888888]">
+                  No se encontraron instituciones con el filtro aplicado.
+                </div>
+              ) : (
+                filteredSchools.map((school) => {
+                  const isSelected = selectedSchoolIds.includes(school.id);
+                  const importada = esEscuelaImportada(school);
+
+                  return (
+                    <div
+                      key={school.id}
+                      onClick={() => toggleSelectSchool(school.id)}
+                      className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex items-start gap-3 ${
+                        isSelected
+                          ? 'bg-white border-[#29008e]/30 shadow-xs'
+                          : 'bg-white/60 border-black/5 hover:border-black/10'
+                      }`}
+                    >
+                      <div className="mt-0.5">
+                        {isSelected ? (
+                          <CheckSquare className="w-4 h-4 text-[#29008e]" />
+                        ) : (
+                          <Square className="w-4 h-4 text-[#888888]" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-xs text-[#111111] truncate">
+                            {school.name}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-[#555555] truncate">
+                          {school.municipality}, {school.state}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                          <span className="text-[10px] px-2 py-0.5 bg-black/5 text-[#555555] rounded-md font-medium">
+                            {school.type.replace('_', ' ')}
+                          </span>
+                          <span className="text-[10px] px-2 py-0.5 bg-[#640354]/10 text-[#640354] rounded-md font-bold flex items-center gap-0.5">
+                            <Award className="w-3 h-3" /> Score {school.leadScore}
+                          </span>
+                          {importada && (
+                            <span className="text-[9px] px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded font-semibold flex items-center gap-0.5">
+                              <FileSpreadsheet className="w-2.5 h-2.5 text-emerald-700" /> Excel
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold text-xs text-[#111111] truncate">
-                        {school.name}
-                      </div>
-                      <div className="text-[11px] text-[#555555] truncate">
-                        {school.municipality}, {school.state}
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <span className="text-[10px] px-2 py-0.5 bg-black/5 text-[#555555] rounded-md font-medium">
-                          {school.type.replace('_', ' ')}
-                        </span>
-                        <span className="text-[10px] px-2 py-0.5 bg-[#640354]/10 text-[#640354] rounded-md font-bold flex items-center gap-0.5">
-                          <Award className="w-3 h-3" /> Score {school.leadScore}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
 
@@ -292,7 +403,7 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
             {isCalculating ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin text-[#a78bfa]" />
-                Optimizando Circuito Logístico...
+                Optimizando Circuito Logístico 2-Opt...
               </>
             ) : (
               <>
@@ -306,12 +417,12 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
         {/* Columna Derecha / Centro: Métricas, Viáticos y Mapa (8 Columnas) */}
         <div className="lg:col-span-8 space-y-6">
           {/* Métricas Resumen Operativas */}
-          {optimizedTrip && (
+          {recorridoActual && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
               <div className="card-light p-4 rounded-2xl">
                 <div className="text-[11px] text-[#888888] font-semibold uppercase tracking-wider">Distancia Total</div>
                 <div className="text-xl font-black text-[#111111] mt-1">
-                  {optimizedTrip.totalDistanceKm} km
+                  {recorridoActual.distancia_total_km} km
                 </div>
                 <div className="text-[11px] text-[#555555]">Circuito completo</div>
               </div>
@@ -319,7 +430,7 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
               <div className="card-light p-4 rounded-2xl">
                 <div className="text-[11px] text-[#888888] font-semibold uppercase tracking-wider">Tiempo Manejo</div>
                 <div className="text-xl font-black text-[#29008e] mt-1">
-                  {Math.floor(optimizedTrip.totalDrivingMinutes / 60)}h {optimizedTrip.totalDrivingMinutes % 60}m
+                  {Math.floor(recorridoActual.minutos_conduccion_total / 60)}h {recorridoActual.minutos_conduccion_total % 60}m
                 </div>
                 <div className="text-[11px] text-emerald-700 font-medium">Tráfico ponderado</div>
               </div>
@@ -327,7 +438,7 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
               <div className="card-light p-4 rounded-2xl">
                 <div className="text-[11px] text-[#888888] font-semibold uppercase tracking-wider">Jornada Estimada</div>
                 <div className="text-xl font-black text-[#111111] mt-1">
-                  {Math.floor(optimizedTrip.totalEstimatedTripMinutes / 60)}h {optimizedTrip.totalEstimatedTripMinutes % 60}m
+                  {Math.floor(recorridoActual.minutos_estimados_totales / 60)}h {recorridoActual.minutos_estimados_totales % 60}m
                 </div>
                 <div className="text-[11px] text-[#555555]">50m/reunión + traslado</div>
               </div>
@@ -335,15 +446,15 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
               <div className="card-light p-4 rounded-2xl">
                 <div className="text-[11px] text-[#888888] font-semibold uppercase tracking-wider">Sedes Programadas</div>
                 <div className="text-xl font-black text-[#640354] mt-1">
-                  {optimizedTrip.stops.length} campus
+                  {recorridoActual.paradas.length} campus
                 </div>
                 <div className="text-[11px] text-[#555555]">Sin duplicar trayectos</div>
               </div>
             </div>
           )}
 
-          {/* PRESUPUESTO DE VIÁTICOS DEVELOP */}
-          {optimizedTrip && (
+          {/* PRESUPUESTO DE VIÁTICOS AUDITABLE DEVELOP */}
+          {recorridoActual && (
             <div className="card-light p-5 rounded-[24px] border border-[#0f094f]/10 shadow-develop-card">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-black/5">
                 <div className="flex items-center gap-3">
@@ -352,38 +463,41 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
                   </div>
                   <div>
                     <h4 className="font-bold text-[#111111] text-sm sm:text-base">
-                      Presupuesto de Viáticos para Autorización Institucional
+                      Liquidación Preventiva de Viáticos (Propuesta PAP)
                     </h4>
                     <p className="text-xs text-[#555555]">
-                      Cálculo automatizado de insumos para la comitiva de campo Develop
+                      Cálculo estandarizado y auditable para autorización de dirección comercial
                     </p>
                   </div>
                 </div>
 
                 <div className="text-left sm:text-right">
-                  <span className="text-[10px] text-[#888888] uppercase font-bold tracking-wider block">Total Autorizado:</span>
-                  <span className="text-xl font-black text-[#0f094f]">
-                    ${optimizedTrip.viaticos.totalViaticosMxn.toLocaleString('es-MX')} <span className="text-xs font-semibold text-[#555555]">MXN</span>
+                  <span className="text-[10px] text-[#888888] uppercase font-bold tracking-wider block">Total Viáticos MXN:</span>
+                  <span className="text-2xl font-black text-[#0f094f]">
+                    ${recorridoActual.viaticos.total_viaticos_mxn.toLocaleString('es-MX')}{' '}
+                    <span className="text-xs font-semibold text-[#555555]">MXN</span>
                   </span>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-4 text-xs">
+                {/* Gasolina */}
                 <div className="bg-[#F8F8FC] p-3.5 rounded-2xl border border-black/5 flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-[#0f094f]/10 flex items-center justify-center text-[#0f094f] shrink-0">
                     <Fuel className="w-4 h-4" />
                   </div>
                   <div>
-                    <div className="text-[10px] text-[#888888] uppercase font-bold">Gasolina</div>
+                    <div className="text-[10px] text-[#888888] uppercase font-bold">Gasolina Magna</div>
                     <div className="font-extrabold text-[#111111] text-sm">
-                      ${optimizedTrip.viaticos.gasolinaMxn.toLocaleString('es-MX')} MXN
+                      ${recorridoActual.viaticos.gasolina_mxn.toLocaleString('es-MX')} MXN
                     </div>
                     <div className="text-[10px] text-[#555555]">
-                      ~{optimizedTrip.viaticos.fuelLitersEstimate} L (10.5 km/L)
+                      ~{recorridoActual.viaticos.estimacion_litros_combustible} L ($24.80/L · 10.5 km/L)
                     </div>
                   </div>
                 </div>
 
+                {/* Casetas y Peajes */}
                 <div className="bg-[#F8F8FC] p-3.5 rounded-2xl border border-black/5 flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-[#29008e]/10 flex items-center justify-center text-[#29008e] shrink-0">
                     <Car className="w-4 h-4" />
@@ -391,14 +505,15 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
                   <div>
                     <div className="text-[10px] text-[#888888] uppercase font-bold">Casetas / Peajes</div>
                     <div className="font-extrabold text-[#111111] text-sm">
-                      ${optimizedTrip.viaticos.casetasMxn.toLocaleString('es-MX')} MXN
+                      ${recorridoActual.viaticos.casetas_mxn.toLocaleString('es-MX')} MXN
                     </div>
                     <div className="text-[10px] text-[#555555]">
-                      Autopistas estatales
+                      Tramos periféricos y autopistas
                     </div>
                   </div>
                 </div>
 
+                {/* Alimentos */}
                 <div className="bg-[#F8F8FC] p-3.5 rounded-2xl border border-black/5 flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-[#640354]/10 flex items-center justify-center text-[#640354] shrink-0">
                     <Utensils className="w-4 h-4" />
@@ -406,10 +521,10 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
                   <div>
                     <div className="text-[10px] text-[#888888] uppercase font-bold">Alimentos / Dieta</div>
                     <div className="font-extrabold text-[#111111] text-sm">
-                      ${optimizedTrip.viaticos.alimentosMxn.toLocaleString('es-MX')} MXN
+                      ${recorridoActual.viaticos.alimentos_mxn.toLocaleString('es-MX')} MXN
                     </div>
                     <div className="text-[10px] text-[#555555]">
-                      {optimizedTrip.viaticos.daysEstimate} día(s) en campo
+                      {recorridoActual.viaticos.estimacion_dias} día(s) en campo ($450 MXN/día)
                     </div>
                   </div>
                 </div>
@@ -430,10 +545,20 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
               <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
                 <button
                   onClick={handleSaveToCRM}
-                  className="btn-primary-develop px-3.5 py-1.5 text-xs font-bold flex items-center gap-1.5"
+                  disabled={guardandoEnCrm || !recorridoActual || recorridoActual.paradas.length === 0}
+                  className="btn-primary-develop px-3.5 py-1.5 text-xs font-bold flex items-center gap-1.5 disabled:opacity-50"
                 >
-                  <Calendar className="w-3.5 h-3.5 text-[#a78bfa]" />
-                  Guardar en Agenda CRM
+                  {guardandoEnCrm ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#a78bfa]" />
+                      Sincronizando con CRM...
+                    </>
+                  ) : (
+                    <>
+                      <Calendar className="w-3.5 h-3.5 text-[#a78bfa]" />
+                      Guardar en Agenda CRM
+                    </>
+                  )}
                 </button>
 
                 {googleMapsUrl && (
@@ -444,16 +569,16 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
                     className="btn-secondary-light px-3.5 py-1.5 text-xs font-semibold flex items-center gap-1.5"
                   >
                     <ExternalLink className="w-3.5 h-3.5 text-[#29008e]" />
-                    Abrir GPS
+                    Abrir GPS Google Maps
                   </a>
                 )}
               </div>
             </div>
 
-            {optimizedTrip && (
+            {recorridoActual && (
               <RouteMap
-                origin={optimizedTrip.origin}
-                stops={optimizedTrip.stops}
+                origen={recorridoActual.origen}
+                paradas={recorridoActual.paradas}
               />
             )}
           </div>
@@ -461,7 +586,7 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
       </div>
 
       {/* ITINERARIO CRONOLÓGICO PASO A PASO */}
-      {optimizedTrip && optimizedTrip.stops.length > 0 && (
+      {recorridoActual && recorridoActual.paradas.length > 0 && (
         <div className="card-light p-4 sm:p-6 lg:p-7 rounded-[20px] sm:rounded-[28px]">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 pb-4 border-b border-black/5">
             <div>
@@ -470,12 +595,17 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
                 Itinerario Oficial & Cronograma de Visitas
               </h3>
               <p className="text-xs text-[#555555] mt-1">
-                Secuencia coordinada de juntas con directores de vinculación y comités de carrera.
+                Secuencia coordinada de juntas con directores de vinculación y comités de carrera para el día {fechaGira}.
               </p>
             </div>
 
-            <div className="text-xs px-3 py-1 bg-[#0f094f]/10 text-[#0f094f] font-bold rounded-full border border-[#0f094f]/15 self-start sm:self-auto">
-              Circuito Cerrado Verificado
+            <div className="flex items-center gap-2">
+              <span className="text-xs px-3 py-1 bg-emerald-50 text-emerald-800 font-bold rounded-full border border-emerald-200">
+                Asesor: {asesorResponsable}
+              </span>
+              <span className="text-xs px-3 py-1 bg-[#0f094f]/10 text-[#0f094f] font-bold rounded-full border border-[#0f094f]/15">
+                Circuito Cerrado Verificado
+              </span>
             </div>
           </div>
 
@@ -486,74 +616,83 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
                 🏁
               </div>
               <div className="bg-[#F8F8FC] p-4 rounded-2xl border border-black/5 text-xs">
-                <div className="font-bold text-[#111111]">Salida: {optimizedTrip.origin.name}</div>
-                <div className="text-[#555555] text-[11px] mt-0.5">{optimizedTrip.origin.address}</div>
+                <div className="font-bold text-[#111111]">Salida: {recorridoActual.origen.nombre}</div>
+                <div className="text-[#555555] text-[11px] mt-0.5">{recorridoActual.origen.direccion}</div>
                 <div className="mt-1.5 font-bold text-[#0f094f]">Hora de salida recomendada: 08:30 hrs</div>
               </div>
             </div>
 
             {/* Paradas de Universidades */}
-            {optimizedTrip.stops.map((stop) => (
-              <div key={stop.order} className="relative group">
-                <div className="absolute -left-[33px] top-1 w-6 h-6 rounded-full bg-gradient-to-br from-[#29008e] to-[#640354] text-white flex items-center justify-center text-xs font-black shadow-md">
-                  {stop.order}
-                </div>
-                
-                <div className="card-light card-light-hover p-3.5 sm:p-5 rounded-[18px] sm:rounded-[22px]">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-[#29008e] px-2.5 py-0.5 bg-[#29008e]/10 rounded-full">
-                          Parada #{stop.order}
-                        </span>
-                        <h4 className="font-bold text-[#111111] text-sm">{stop.name}</h4>
-                      </div>
-                      <p className="text-xs text-[#555555] mt-1">{stop.address}</p>
-                    </div>
+            {recorridoActual.paradas.map((stop) => {
+              const esImportada = stop.escuela_original ? esEscuelaImportada(stop.escuela_original) : false;
 
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-2 md:mt-0">
-                      <div className="text-left md:text-right">
-                        <div className="text-xs font-bold text-[#111111] flex items-center gap-1 justify-start md:justify-end">
-                          <Clock className="w-3.5 h-3.5 text-[#29008e]" />
-                          {stop.recommendedMeetingHour}
+              return (
+                <div key={stop.orden} className="relative group">
+                  <div className="absolute -left-[33px] top-1 w-6 h-6 rounded-full bg-gradient-to-br from-[#29008e] to-[#640354] text-white flex items-center justify-center text-xs font-black shadow-md">
+                    {stop.orden}
+                  </div>
+                  
+                  <div className="card-light card-light-hover p-3.5 sm:p-5 rounded-[18px] sm:rounded-[22px]">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] font-bold text-[#29008e] px-2.5 py-0.5 bg-[#29008e]/10 rounded-full">
+                            Parada #{stop.orden}
+                          </span>
+                          <h4 className="font-bold text-[#111111] text-sm">{stop.nombre}</h4>
+                          {esImportada && (
+                            <span className="text-[9px] px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-semibold flex items-center gap-0.5">
+                              <FileSpreadsheet className="w-2.5 h-2.5 text-emerald-700" /> Excel
+                            </span>
+                          )}
                         </div>
-                        <div className="text-[11px] text-[#888888]">
-                          {stop.drivingTimeFromPrevMin} min de traslado ({stop.distanceFromPrevKm} km)
-                        </div>
+                        <p className="text-xs text-[#555555] mt-1">{stop.direccion}</p>
                       </div>
 
-                      {onSelectSchoolForCRM && (
-                        <button
-                          onClick={() => onSelectSchoolForCRM(stop.schoolId)}
-                          className="btn-primary-develop px-3.5 py-1.5 text-xs font-bold flex items-center gap-1 shrink-0"
-                        >
-                          <Building2 className="w-3.5 h-3.5 text-[#a78bfa]" />
-                          Ficha CRM
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-2 md:mt-0">
+                        <div className="text-left md:text-right">
+                          <div className="text-xs font-bold text-[#111111] flex items-center gap-1 justify-start md:justify-end">
+                            <Clock className="w-3.5 h-3.5 text-[#29008e]" />
+                            {stop.hora_reunion_recomendada}
+                          </div>
+                          <div className="text-[11px] text-[#888888]">
+                            {stop.tiempo_conduccion_minutos} min de traslado ({stop.distancia_desde_anterior_km} km)
+                          </div>
+                        </div>
 
-                  <div className="mt-3.5 pt-3 border-t border-black/5 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-                    <div className="flex items-center gap-1.5 text-[#555555]">
-                      <span className="font-medium text-[#888888]">Titular:</span>
-                      <span className="font-bold text-[#111111]">{stop.directorName}</span>
+                        {onSelectSchoolForCRM && (
+                          <button
+                            onClick={() => onSelectSchoolForCRM(stop.universidad_id)}
+                            className="btn-primary-develop px-3.5 py-1.5 text-xs font-bold flex items-center gap-1 shrink-0"
+                          >
+                            <Building2 className="w-3.5 h-3.5 text-[#a78bfa]" />
+                            Ficha CRM
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5 text-[#555555]">
-                      <Phone className="w-3.5 h-3.5 text-[#888888]" />
-                      <a href={`tel:${stop.phone}`} className="hover:text-[#29008e] font-medium text-[#0f094f]">
-                        {stop.phone}
-                      </a>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[#555555]">
-                      <Award className="w-3.5 h-3.5 text-[#640354]" />
-                      <span className="font-medium text-[#888888]">Lead Score:</span>
-                      <span className="font-bold text-[#640354]">{stop.leadScore}/100</span>
+
+                    <div className="mt-3.5 pt-3 border-t border-black/5 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                      <div className="flex items-center gap-1.5 text-[#555555]">
+                        <span className="font-medium text-[#888888]">Titular:</span>
+                        <span className="font-bold text-[#111111]">{stop.director_nombre}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[#555555]">
+                        <Phone className="w-3.5 h-3.5 text-[#888888]" />
+                        <a href={`tel:${stop.telefono}`} className="hover:text-[#29008e] font-medium text-[#0f094f]">
+                          {stop.telefono}
+                        </a>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[#555555]">
+                        <Award className="w-3.5 h-3.5 text-[#640354]" />
+                        <span className="font-medium text-[#888888]">Lead Score:</span>
+                        <span className="font-bold text-[#640354]">{stop.puntuacion_prioridad}/100</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {/* Punto de Retorno */}
             <div className="relative">
@@ -561,9 +700,9 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
                 🏁
               </div>
               <div className="bg-[#0f094f]/5 p-4 rounded-2xl border border-[#0f094f]/15 text-xs">
-                <div className="font-bold text-[#0f094f]">Retorno a Sede Base: {optimizedTrip.origin.name}</div>
+                <div className="font-bold text-[#0f094f]">Retorno a Sede Base: {recorridoActual.origen.nombre}</div>
                 <div className="text-[#555555] text-[11px] mt-0.5">
-                  Conclusión del circuito en CDMX. Los acuerdos y minutas quedan registrados en el CRM de Develop.
+                  Conclusión del circuito cerrado en CDMX. Todos los viáticos y minutas programadas quedan registrados en el CRM.
                 </div>
               </div>
             </div>

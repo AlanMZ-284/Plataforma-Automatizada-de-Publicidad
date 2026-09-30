@@ -16,11 +16,8 @@ import {
   Mail,
   User,
   Phone,
-  BookOpen,
   Calendar,
   X,
-  FileText,
-  Building2,
   Lock,
   ArrowRight,
   QrCode

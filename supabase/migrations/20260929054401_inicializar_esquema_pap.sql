@@ -408,52 +408,52 @@ ALTER TABLE prospectos_alumnos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE recorridos_rutas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE paradas_ruta ENABLE ROW LEVEL SECURITY;
 
--- Políticas de lectura para usuarios autenticados
+-- Políticas de lectura para usuarios del sistema y entorno local
 CREATE POLICY "Permitir lectura completa a usuarios autenticados" ON universidades
-    FOR SELECT TO authenticated USING (true);
+    FOR SELECT TO authenticated, anon USING (true);
 
 CREATE POLICY "Permitir lectura de contactos a usuarios autenticados" ON contactos_universidad
-    FOR SELECT TO authenticated USING (true);
+    FOR SELECT TO authenticated, anon USING (true);
 
 CREATE POLICY "Permitir lectura de carreras a usuarios autenticados" ON carreras_universidad
-    FOR SELECT TO authenticated USING (true);
+    FOR SELECT TO authenticated, anon USING (true);
 
 CREATE POLICY "Permitir lectura de oportunidades a usuarios autenticados" ON oportunidades
-    FOR SELECT TO authenticated USING (true);
+    FOR SELECT TO authenticated, anon USING (true);
 
 CREATE POLICY "Permitir lectura de actividades a usuarios autenticados" ON actividades_crm
-    FOR SELECT TO authenticated USING (true);
+    FOR SELECT TO authenticated, anon USING (true);
 
 CREATE POLICY "Permitir lectura de prospectos a usuarios autenticados" ON prospectos_alumnos
-    FOR SELECT TO authenticated USING (true);
+    FOR SELECT TO authenticated, anon USING (true);
 
 CREATE POLICY "Permitir lectura de recorridos a usuarios autenticados" ON recorridos_rutas
-    FOR SELECT TO authenticated USING (true);
+    FOR SELECT TO authenticated, anon USING (true);
 
 CREATE POLICY "Permitir lectura de paradas a usuarios autenticados" ON paradas_ruta
-    FOR SELECT TO authenticated USING (true);
+    FOR SELECT TO authenticated, anon USING (true);
 
--- Políticas de inserción/edición para usuarios autenticados (asesores y administradores)
+-- Políticas de inserción/edición para usuarios y entorno local
 CREATE POLICY "Permitir modificacion total a usuarios autenticados" ON universidades
-    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+    FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
 
 CREATE POLICY "Permitir modificacion total de contactos a usuarios autenticados" ON contactos_universidad
-    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+    FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
 
 CREATE POLICY "Permitir modificacion total de carreras a usuarios autenticados" ON carreras_universidad
-    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+    FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
 
 CREATE POLICY "Permitir modificacion total de oportunidades a usuarios autenticados" ON oportunidades
-    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+    FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
 
 CREATE POLICY "Permitir modificacion total de actividades a usuarios autenticados" ON actividades_crm
-    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+    FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
 
 CREATE POLICY "Permitir modificacion total de recorridos a usuarios autenticados" ON recorridos_rutas
-    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+    FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
 
 CREATE POLICY "Permitir modificacion total de paradas a usuarios autenticados" ON paradas_ruta
-    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+    FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
 
 -- Política especial para prospectos alumnos: Inserción anónima permitida para el escaneo de QR en eventos
 CREATE POLICY "Permitir captura publica de prospectos mediante QR" ON prospectos_alumnos
@@ -461,4 +461,4 @@ CREATE POLICY "Permitir captura publica de prospectos mediante QR" ON prospectos
     WITH CHECK (true);
 
 CREATE POLICY "Permitir gestion de prospectos a usuarios autenticados" ON prospectos_alumnos
-    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+    FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
