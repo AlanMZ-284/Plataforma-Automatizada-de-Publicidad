@@ -24,10 +24,7 @@ import {
   Menu,
   X,
   PanelLeftClose,
-  PanelLeftOpen,
-  QrCode,
-  Share2,
-  BarChart3
+  PanelLeftOpen
 } from 'lucide-react';
 
 type MainView = 'crm-pipeline' | 'crm-schools' | 'routes' | 'events-kit' | 'marketing' | 'analitica-roi' | 'registro-alumno-qr';
@@ -68,6 +65,7 @@ export function App() {
 
   // Estado para la oportunidad activa en el Formulario QR de captura de alumnos
   const [activeQrDealId, setActiveQrDealId] = useState<string | null>(deals[0]?.id || null);
+  const [modalQrAbierto, setModalQrAbierto] = useState(false);
 
   // Soporte para abrir directamente el formulario QR por URL (?vista=registro-alumno-qr&dealId=xxx)
   React.useEffect(() => {
@@ -77,7 +75,8 @@ export function App() {
       const dealIdParam = parametros.get('dealId');
       if (vistaParam === 'registro-alumno-qr') {
         if (dealIdParam) setActiveQrDealId(dealIdParam);
-        setCurrentView('registro-alumno-qr');
+        setModalQrAbierto(true);
+        setCurrentView('crm-pipeline');
       }
     } catch {
       // Entorno sin window
@@ -247,13 +246,10 @@ export function App() {
     { id: 'crm-pipeline' as MainView, label: 'Pipeline de Ventas', shortLabel: 'Pipeline', icon: LayoutDashboard },
     { id: 'crm-schools' as MainView, label: 'Directorio 360°', shortLabel: 'Directorio', icon: Building2 },
     { id: 'routes' as MainView, label: 'Rutas Logísticas', shortLabel: 'Rutas', icon: MapPin },
-    { id: 'events-kit' as MainView, label: 'Kits & Contenidos IA', shortLabel: 'Kits IA', icon: Sparkles },
-    { id: 'marketing' as MainView, label: 'Marketing Multicanal', shortLabel: 'Marketing', icon: Share2 },
-    { id: 'analitica-roi' as MainView, label: 'Tablero ROI & Analítica', shortLabel: 'ROI & KPIs', icon: BarChart3 },
-    { id: 'registro-alumno-qr' as MainView, label: 'Captura QR en Stand', shortLabel: 'Captura QR', icon: QrCode }
+    { id: 'events-kit' as MainView, label: 'Kits & Contenidos IA', shortLabel: 'Kits IA', icon: Sparkles }
   ];
 
-  const currentNav = navItems.find((n) => n.id === currentView);
+  const currentNav = navItems.find((n) => n.id === currentView) || navItems[0];
 
   return (
     <div className="h-screen w-full bg-[#F8F8FC] text-[#111111] flex overflow-hidden font-sans antialiased selection:bg-[#29008e] selection:text-white">
@@ -540,7 +536,7 @@ export function App() {
                 onAddActivity={handleAddActivity}
                 onAbrirRegistroQr={(dealId) => {
                   setActiveQrDealId(dealId);
-                  setCurrentView('registro-alumno-qr');
+                  setModalQrAbierto(true);
                 }}
               />
             )}
@@ -687,6 +683,47 @@ export function App() {
           );
         })}
       </nav>
+
+      {/* ============================================================== */}
+      {/* MODAL SUPERPUESTO DE CAPTURA QR CON FONDO OSCURO DESENFOCADO    */}
+      {/* ============================================================== */}
+      {modalQrAbierto && (() => {
+        const tratoActivo = deals.find((d) => d.id === activeQrDealId) || deals[0];
+        const universidadActiva = companies.find((c) => c.id === tratoActivo?.companyId);
+
+        const cerrarModal = () => {
+          setModalQrAbierto(false);
+          setCurrentView('crm-pipeline');
+        };
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-fadeIn">
+            {/* Fondo oscuro desenfocado */}
+            <div
+              className="fixed inset-0 bg-[#07052e]/80 backdrop-blur-md transition-opacity cursor-pointer"
+              onClick={cerrarModal}
+              title="Cerrar modal"
+            />
+
+            {/* Contenedor relativo centrado */}
+            <div className="relative z-10 w-full max-w-lg my-auto shadow-develop-modal">
+              <FormularioRegistroAlumnoQr
+                oportunidadId={tratoActivo?.id || ''}
+                universidadId={tratoActivo?.companyId || ''}
+                nombreUniversidad={universidadActiva?.name || 'Universidad Aliada'}
+                tituloEvento={tratoActivo?.title || 'Feria de Empleo & Talento'}
+                esModal={true}
+                alRegistrarExitoso={() => {
+                  if (tratoActivo) {
+                    handleUpdateDealLeads(tratoActivo.id, (tratoActivo.registeredLeadsCount || 0) + 1);
+                  }
+                }}
+                alCerrarVista={cerrarModal}
+              />
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

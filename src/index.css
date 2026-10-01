@@ -248,6 +248,11 @@ body {
   transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
 }
 
+/* Modificador para inputs y selectores con icono lateral izquierdo */
+.input-develop-con-icono {
+  padding-left: 2.75rem !important;
+}
+
 .input-develop:focus {
   outline: none;
   border-color: rgba(15, 9, 79, 0.30);

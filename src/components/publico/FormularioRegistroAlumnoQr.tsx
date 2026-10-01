@@ -35,6 +35,7 @@ interface PropiedadesFormularioRegistroAlumnoQr {
     carrera: string;
   }) => void;
   alCerrarVista?: () => void;
+  esModal?: boolean;
 }
 
 const CARRERAS_COMUNES = [
@@ -56,7 +57,8 @@ export const FormularioRegistroAlumnoQr: React.FC<PropiedadesFormularioRegistroA
   nombreUniversidad = 'Universidad Aliada Develop',
   tituloEvento = 'Feria de Talento & Vinculación Tech',
   alRegistrarExitoso,
-  alCerrarVista
+  alCerrarVista,
+  esModal = false
 }) => {
   // Estados del formulario
   const [nombreCompleto, setNombreCompleto] = useState('');
@@ -142,25 +144,23 @@ export const FormularioRegistroAlumnoQr: React.FC<PropiedadesFormularioRegistroA
     setRegistroExitoso(false);
   };
 
-  return (
-    <div className="min-h-screen bg-[#F8F8FC] flex flex-col justify-center items-center py-4 px-3 sm:px-6">
+  const contenidoTarjeta = (
+    <div className={`w-full max-w-lg bg-white rounded-[26px] shadow-develop-modal border border-black/10 overflow-hidden flex flex-col relative animate-fadeIn ${esModal ? 'max-h-[90vh] overflow-y-auto' : ''}`}>
       
-      {/* TARJETA CONTENEDORA MOBILE-FIRST */}
-      <div className="w-full max-w-lg bg-white rounded-[26px] shadow-develop-modal border border-black/10 overflow-hidden flex flex-col relative animate-fadeIn">
+      {/* ENCABEZADO DARK PREMIUM DEVELOP */}
+      <div className="premium-dark-surface p-6 text-white relative border-b border-white/10 shrink-0">
         
-        {/* ENCABEZADO DARK PREMIUM DEVELOP */}
-        <div className="premium-dark-surface p-6 text-white relative border-b border-white/10">
-          
-          {/* Botón cerrar si se visualiza dentro del CRM como simulación */}
-          {alCerrarVista && (
-            <button
-              onClick={alCerrarVista}
-              className="absolute top-4 right-4 z-20 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition-colors"
-              title="Cerrar vista móvil"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
+        {/* Botón cerrar si se visualiza dentro del CRM como simulación o modal */}
+        {alCerrarVista && (
+          <button
+            type="button"
+            onClick={alCerrarVista}
+            className="absolute top-4 right-4 z-20 w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white/90 hover:text-white transition-colors cursor-pointer shadow-sm"
+            title="Cerrar formulario"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
 
           <div className="relative z-10 flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#29008e] to-[#640354] p-[1.5px] shadow-develop-glow/40 shrink-0">
@@ -266,14 +266,14 @@ export const FormularioRegistroAlumnoQr: React.FC<PropiedadesFormularioRegistroA
                   Nombre Completo *
                 </label>
                 <div className="relative">
-                  <User className="w-4 h-4 text-[#888888] absolute left-3.5 top-3" />
+                  <User className="w-4 h-4 text-[#888888] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="text"
                     required
                     placeholder="Ej. Sofía Ramírez Mendoza"
                     value={nombreCompleto}
                     onChange={(e) => setNombreCompleto(e.target.value)}
-                    className="input-develop w-full pl-10 pr-3 text-xs"
+                    className="input-develop input-develop-con-icono w-full pr-3 text-xs"
                   />
                 </div>
               </div>
@@ -284,14 +284,14 @@ export const FormularioRegistroAlumnoQr: React.FC<PropiedadesFormularioRegistroA
                   Correo Electrónico *
                 </label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-[#888888] absolute left-3.5 top-3" />
+                  <Mail className="w-4 h-4 text-[#888888] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="email"
                     required
                     placeholder="alumno@universidad.edu.mx o personal"
                     value={correoElectronico}
                     onChange={(e) => setCorreoElectronico(e.target.value)}
-                    className="input-develop w-full pl-10 pr-3 text-xs"
+                    className="input-develop input-develop-con-icono w-full pr-3 text-xs"
                   />
                 </div>
               </div>
@@ -302,13 +302,13 @@ export const FormularioRegistroAlumnoQr: React.FC<PropiedadesFormularioRegistroA
                   Teléfono Móvil / WhatsApp
                 </label>
                 <div className="relative">
-                  <Phone className="w-4 h-4 text-[#888888] absolute left-3.5 top-3" />
+                  <Phone className="w-4 h-4 text-[#888888] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="tel"
                     placeholder="55 1234 5678"
                     value={telefonoWhatsApp}
                     onChange={(e) => setTelefonoWhatsApp(e.target.value)}
-                    className="input-develop w-full pl-10 pr-3 text-xs"
+                    className="input-develop input-develop-con-icono w-full pr-3 text-xs"
                   />
                 </div>
               </div>
@@ -320,11 +320,11 @@ export const FormularioRegistroAlumnoQr: React.FC<PropiedadesFormularioRegistroA
                     Carrera Universitaria *
                   </label>
                   <div className="relative">
-                    <GraduationCap className="w-4 h-4 text-[#888888] absolute left-3 top-3 pointer-events-none" />
+                    <GraduationCap className="w-4 h-4 text-[#888888] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <select
                       value={carreraSeleccionada}
                       onChange={(e) => setCarreraSeleccionada(e.target.value)}
-                      className="input-develop w-full pl-9 pr-3 text-xs font-medium"
+                      className="input-develop input-develop-con-icono w-full pr-3 text-xs font-medium cursor-pointer"
                     >
                       {CARRERAS_COMUNES.map((c) => (
                         <option key={c} value={c}>
@@ -340,11 +340,11 @@ export const FormularioRegistroAlumnoQr: React.FC<PropiedadesFormularioRegistroA
                     Semestre
                   </label>
                   <div className="relative">
-                    <Calendar className="w-4 h-4 text-[#888888] absolute left-3 top-3 pointer-events-none" />
+                    <Calendar className="w-4 h-4 text-[#888888] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <select
                       value={semestreActual}
                       onChange={(e) => setSemestreActual(e.target.value)}
-                      className="input-develop w-full pl-9 pr-3 text-xs font-medium"
+                      className="input-develop input-develop-con-icono w-full pr-3 text-xs font-medium cursor-pointer"
                     >
                       {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((num) => (
                         <option key={num} value={num.toString()}>
@@ -431,69 +431,80 @@ export const FormularioRegistroAlumnoQr: React.FC<PropiedadesFormularioRegistroA
           )}
         </div>
       </div>
+    );
 
-      {/* MODAL SIMPLIFICADO DE AVISO DE PRIVACIDAD LFPDPPP */}
-      {modalAvisoAbierto && (
-        <div className="fixed inset-0 z-50 bg-[#07052e]/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-[24px] shadow-develop-modal border border-black/10 flex flex-col max-h-[85vh] overflow-hidden animate-fadeIn">
-            
-            <div className="p-4 sm:p-5 bg-gradient-to-r from-[#07052e] to-[#0f094f] text-white flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <ShieldCheck className="w-5 h-5 text-[#a78bfa]" />
-                <h3 className="font-bold text-sm text-white">
-                  Aviso de Privacidad Simplificado (LFPDPPP)
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setModalAvisoAbierto(false)}
-                className="w-7 h-7 rounded-lg text-white/70 hover:text-white hover:bg-white/10 flex items-center justify-center"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+    return (
+      <>
+        {esModal ? (
+          contenidoTarjeta
+        ) : (
+          <div className="min-h-screen bg-[#F8F8FC] flex flex-col justify-center items-center py-4 px-3 sm:px-6">
+            {contenidoTarjeta}
+          </div>
+        )}
 
-            <div className="p-5 sm:p-6 overflow-y-auto text-xs text-[#555555] space-y-3 leading-relaxed">
-              <p>
-                En estricto cumplimiento con la <strong>Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP)</strong> de los Estados Unidos Mexicanos, <strong>Develop Talent Ecosystem</strong> informa:
-              </p>
-
-              <div className="p-3 bg-[#F8F8FC] rounded-xl border border-black/5 space-y-1.5">
-                <strong className="text-[#111111] block">1. Finalidades Principales del Tratamiento:</strong>
-                <ul className="list-disc pl-4 space-y-1 text-[11px]">
-                  <li>Vinculación con programas de residencias y estancias profesionales.</li>
-                  <li>Inscripción en convocatorias de becas, hackathons y bootcamps tecnológicos.</li>
-                  <li>Envío de invitaciones a capacitaciones de marcas aliadas (AWS, Microsoft, Google Cloud, Cisco, Intel, Oracle).</li>
-                </ul>
+        {/* MODAL SIMPLIFICADO DE AVISO DE PRIVACIDAD LFPDPPP */}
+        {modalAvisoAbierto && (
+          <div className="fixed inset-0 z-[60] bg-[#07052e]/75 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white w-full max-w-lg rounded-[24px] shadow-develop-modal border border-black/10 flex flex-col max-h-[85vh] overflow-hidden animate-fadeIn">
+              
+              <div className="p-4 sm:p-5 bg-gradient-to-r from-[#07052e] to-[#0f094f] text-white flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <ShieldCheck className="w-5 h-5 text-[#a78bfa]" />
+                  <h3 className="font-bold text-sm text-white">
+                    Aviso de Privacidad Simplificado (LFPDPPP)
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setModalAvisoAbierto(false)}
+                  className="w-7 h-7 rounded-lg text-white/70 hover:text-white hover:bg-white/10 flex items-center justify-center"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
 
-              <div className="p-3 bg-[#F8F8FC] rounded-xl border border-black/5 space-y-1.5">
-                <strong className="text-[#111111] block">2. Derechos ARCO:</strong>
-                <p className="text-[11px]">
-                  Usted tiene derecho en cualquier momento a conocer qué datos personales tenemos, para qué los utilizamos y las condiciones de uso (Acceso); solicitar la corrección de su información (Rectificación); que la eliminemos de nuestros registros (Cancelación); así como oponerse al uso de los mismos para fines específicos (Oposición).
+              <div className="p-5 sm:p-6 overflow-y-auto text-xs text-[#555555] space-y-3 leading-relaxed">
+                <p>
+                  En estricto cumplimiento con la <strong>Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP)</strong> de los Estados Unidos Mexicanos, <strong>Develop Talent Ecosystem</strong> informa:
                 </p>
+
+                <div className="p-3 bg-[#F8F8FC] rounded-xl border border-black/5 space-y-1.5">
+                  <strong className="text-[#111111] block">1. Finalidades Principales del Tratamiento:</strong>
+                  <ul className="list-disc pl-4 space-y-1 text-[11px]">
+                    <li>Vinculación con programas de residencias y estancias profesionales.</li>
+                    <li>Inscripción en convocatorias de becas, hackathons y bootcamps tecnológicos.</li>
+                    <li>Envío de invitaciones a capacitaciones de marcas aliadas (AWS, Microsoft, Google Cloud, Cisco, Intel, Oracle).</li>
+                  </ul>
+                </div>
+
+                <div className="p-3 bg-[#F8F8FC] rounded-xl border border-black/5 space-y-1.5">
+                  <strong className="text-[#111111] block">2. Derechos ARCO:</strong>
+                  <p className="text-[11px]">
+                    Usted tiene derecho en cualquier momento a conocer qué datos personales tenemos, para qué los utilizamos y las condiciones de uso (Acceso); solicitar la corrección de su información (Rectificación); que la eliminemos de nuestros registros (Cancelación); así como oponerse al uso de los mismos para fines específicos (Oposición).
+                  </p>
+                </div>
+
+                <div className="p-3 bg-[#F8F8FC] rounded-xl border border-black/5 space-y-1.5">
+                  <strong className="text-[#111111] block">3. Transferencia de Datos:</strong>
+                  <p className="text-[11px]">
+                    Sus datos personales únicamente podrán ser compartidos con la institución universitaria donde cursa sus estudios ({nombreUniversidad}) para validar su matrícula y estatus académico.
+                  </p>
+                </div>
               </div>
 
-              <div className="p-3 bg-[#F8F8FC] rounded-xl border border-black/5 space-y-1.5">
-                <strong className="text-[#111111] block">3. Transferencia de Datos:</strong>
-                <p className="text-[11px]">
-                  Sus datos personales únicamente podrán ser compartidos con la institución universitaria donde cursa sus estudios ({nombreUniversidad}) para validar su matrícula y estatus académico.
-                </p>
+              <div className="p-4 border-t border-black/10 bg-white flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setModalAvisoAbierto(false)}
+                  className="btn-primary-develop text-xs px-5 py-2 rounded-xl font-bold"
+                >
+                  Entendido y de Acuerdo
+                </button>
               </div>
-            </div>
-
-            <div className="p-4 border-t border-black/10 bg-white flex justify-end">
-              <button
-                type="button"
-                onClick={() => setModalAvisoAbierto(false)}
-                className="btn-primary-develop text-xs px-5 py-2 rounded-xl font-bold"
-              >
-                Entendido y de Acuerdo
-              </button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
-};
+        )}
+      </>
+    );
+  };
