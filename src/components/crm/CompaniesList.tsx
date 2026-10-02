@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Company, Contact, Deal, Activity } from '../../types';
+import { Company, Contact, Deal, Activity, CompanyType, ProjectModality } from '../../types';
 import { 
   Building2, 
   Search, 
@@ -12,17 +12,26 @@ import {
   Calendar, 
   Plus, 
   CheckCircle, 
-  FileText,
-  Navigation,
-  X,
-  FileSpreadsheet,
-  Database,
-  Sparkles,
-  UploadCloud
+  FileText, 
+  Navigation, 
+  X, 
+  FileSpreadsheet, 
+  Database, 
+  Sparkles, 
+  UploadCloud,
+  UserPlus,
+  RefreshCw,
+  Loader2,
+  Edit3
 } from 'lucide-react';
 import { ModalImportarExcel } from './ModalImportarExcel';
 import { transformarUniversidadACompania } from '../../utils/lectorExcelUniversidades';
 import { Universidad } from '../../types/base_datos';
+import {
+  insertarUniversidadesEnBD,
+  guardarContactoUniversidadEnBD,
+  actualizarUniversidadEnBD
+} from '../../services/servicioCrm';
 
 interface CompaniesListProps {
   companies: Company[];
@@ -36,6 +45,7 @@ interface CompaniesListProps {
   onOpenCompanyDetail?: (id: string) => void;
   onImportCompanies?: (newCompanies: Company[]) => void;
   onCargarSemilla?: () => void;
+  onAddContact?: (newContact: Contact) => void;
 }
 
 export const CompaniesList: React.FC<CompaniesListProps> = ({
@@ -49,15 +59,66 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
   onCloseCompanyDetail,
   onOpenCompanyDetail,
   onImportCompanies,
-  onCargarSemilla
+  onCargarSemilla,
+  onAddContact
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedState, setSelectedState] = useState<string>('todos');
   const [activeModalCompanyId, setActiveModalCompanyId] = useState<string | null>(selectedCompanyId || null);
 
+  // Instituciones locales reactivas sincronizadas con la propiedad externa
+  const [companiasLocales, setCompaniasLocales] = useState<Company[]>(companies);
+  React.useEffect(() => {
+    setCompaniasLocales(companies);
+  }, [companies]);
+
+  // Contactos locales reactivos sincronizados con la propiedad externa
+  const [contactosLocales, setContactosLocales] = useState<Contact[]>(contacts);
+  React.useEffect(() => {
+    setContactosLocales(contacts);
+  }, [contacts]);
+
   // Estados para importación inteligente de Excel / CSV
   const [modalImportarAbierto, setModalImportarAbierto] = useState(false);
   const [mensajeExitoImportacion, setMensajeExitoImportacion] = useState<string | null>(null);
+
+  // Estados para registro manual de universidad
+  const [modalRegistroManualAbierto, setModalRegistroManualAbierto] = useState(false);
+  const [guardandoNuevaUniversidad, setGuardandoNuevaUniversidad] = useState(false);
+  const [formUnivNombre, setFormUnivNombre] = useState('');
+  const [formUnivTipo, setFormUnivTipo] = useState<CompanyType>('universidad');
+  const [formUnivEstado, setFormUnivEstado] = useState<'CDMX' | 'Estado de México'>('CDMX');
+  const [formUnivMunicipio, setFormUnivMunicipio] = useState('');
+  const [formUnivDireccion, setFormUnivDireccion] = useState('');
+  const [formUnivModalidad, setFormUnivModalidad] = useState<ProjectModality>('modalidad_a_programa');
+  const [formUnivTelefono, setFormUnivTelefono] = useState('');
+  const [formUnivEmail, setFormUnivEmail] = useState('');
+  const [formUnivDirector, setFormUnivDirector] = useState('');
+  const [formUnivMatricula, setFormUnivMatricula] = useState('');
+  const [formUnivColegiatura, setFormUnivColegiatura] = useState('');
+
+  // Estados para edición de universidad en el Directorio 360
+  const [modalEdicionAbierto, setModalEdicionAbierto] = useState(false);
+  const [guardandoEdicion, setGuardandoEdicion] = useState(false);
+  const [formEditNombre, setFormEditNombre] = useState('');
+  const [formEditDirector, setFormEditDirector] = useState('');
+  const [formEditTelefono, setFormEditTelefono] = useState('');
+  const [formEditEmail, setFormEditEmail] = useState('');
+  const [formEditMatricula, setFormEditMatricula] = useState('');
+  const [formEditColegiatura, setFormEditColegiatura] = useState('');
+  const [formEditModalidad, setFormEditModalidad] = useState<ProjectModality>('modalidad_a_programa');
+  const [formEditEstado, setFormEditEstado] = useState<'CDMX' | 'Estado de México'>('CDMX');
+  const [formEditMunicipio, setFormEditMunicipio] = useState('');
+  const [formEditDireccion, setFormEditDireccion] = useState('');
+  const [formEditTipo, setFormEditTipo] = useState<CompanyType>('universidad');
+
+  // Estados para registro manual de contacto institucional
+  const [formularioNuevoContactoAbierto, setFormularioNuevoContactoAbierto] = useState(false);
+  const [guardandoNuevoContacto, setGuardandoNuevoContacto] = useState(false);
+  const [formContactoNombre, setFormContactoNombre] = useState('');
+  const [formContactoCargo, setFormContactoCargo] = useState('');
+  const [formContactoCorreo, setFormContactoCorreo] = useState('');
+  const [formContactoTelefono, setFormContactoTelefono] = useState('');
 
   // Estados para nuevo log de actividad
   const [activityType, setActivityType] = useState<'call' | 'meeting' | 'email' | 'note' | 'task'>('call');
@@ -71,8 +132,82 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
     }
   }, [selectedCompanyId]);
 
+  const abrirModalEdicion = (empresa: Company) => {
+    setFormEditNombre(empresa.name);
+    setFormEditDirector(empresa.directorName === 'Sin titular registrado' ? '' : empresa.directorName);
+    setFormEditTelefono(empresa.phone === 'Sin teléfono registrado' ? '' : empresa.phone);
+    setFormEditEmail(empresa.email === 'Sin correo registrado' ? '' : empresa.email);
+    setFormEditMatricula(empresa.studentCount > 0 ? String(empresa.studentCount) : '');
+    setFormEditColegiatura(empresa.monthlyTuition > 0 ? String(empresa.monthlyTuition) : '');
+    setFormEditModalidad(empresa.preferredModality || 'modalidad_a_programa');
+    setFormEditEstado(empresa.state || 'CDMX');
+    setFormEditMunicipio(empresa.municipality || '');
+    setFormEditDireccion(empresa.address || '');
+    setFormEditTipo(empresa.type || 'universidad');
+    setModalEdicionAbierto(true);
+  };
+
+  const manejarGuardarEdicion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeCompany || !formEditNombre.trim()) return;
+
+    setGuardandoEdicion(true);
+    try {
+      const matriculaNum = formEditMatricula.trim() ? Number(formEditMatricula) : 0;
+      const colegiaturaNum = formEditColegiatura.trim() ? Number(formEditColegiatura) : 0;
+
+      const datosActualizados = {
+        nombre: formEditNombre.trim(),
+        director_nombre: formEditDirector.trim() || null,
+        telefono: formEditTelefono.trim() || null,
+        correo_electronico: formEditEmail.trim() || null,
+        matricula_estudiantes: isNaN(matriculaNum) ? 0 : matriculaNum,
+        colegiatura_mensual: isNaN(colegiaturaNum) ? 0 : colegiaturaNum,
+        modalidad_preferida: formEditModalidad,
+        estado: formEditEstado,
+        municipio: formEditMunicipio.trim() || activeCompany.municipality,
+        direccion: formEditDireccion.trim() || activeCompany.address,
+        tipo: formEditTipo
+      };
+
+      const res = await actualizarUniversidadEnBD(activeCompany.id, datosActualizados);
+
+      if (res.exito) {
+        const companiaModificada: Company = {
+          ...activeCompany,
+          name: datosActualizados.nombre,
+          directorName: datosActualizados.director_nombre || 'Sin titular registrado',
+          phone: datosActualizados.telefono || 'Sin teléfono registrado',
+          email: datosActualizados.correo_electronico || 'Sin correo registrado',
+          studentCount: datosActualizados.matricula_estudiantes,
+          monthlyTuition: datosActualizados.colegiatura_mensual,
+          preferredModality: datosActualizados.modalidad_preferida,
+          state: datosActualizados.estado,
+          municipality: datosActualizados.municipio,
+          address: datosActualizados.direccion,
+          type: datosActualizados.tipo
+        };
+
+        setCompaniasLocales((prev) =>
+          prev.map((c) => (c.id === activeCompany.id ? companiaModificada : c))
+        );
+
+        setMensajeExitoImportacion('¡Información institucional actualizada exitosamente!');
+        setModalEdicionAbierto(false);
+        setTimeout(() => setMensajeExitoImportacion(null), 6000);
+      } else {
+        alert(`Error al actualizar en la base de datos: ${res.error || 'Verifica la conexión con PostgreSQL'}`);
+      }
+    } catch (err: any) {
+      console.error('Error al guardar edición de universidad:', err);
+    } finally {
+      setGuardandoEdicion(false);
+    }
+  };
+
   const manejarImportacionUniversidades = (universidadesImportadas: Universidad[]) => {
     const companiasTransformadas = universidadesImportadas.map(transformarUniversidadACompania);
+    setCompaniasLocales((prev) => [...companiasTransformadas, ...prev]);
     if (onImportCompanies) {
       onImportCompanies(companiasTransformadas);
     }
@@ -82,7 +217,7 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
     }, 6000);
   };
 
-  const filteredCompanies = companies.filter((c) => {
+  const filteredCompanies = companiasLocales.filter((c) => {
     const matchesSearch = 
       c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.municipality.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -91,10 +226,109 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
     return matchesSearch && matchesState;
   });
 
-  const activeCompany = companies.find((c) => c.id === activeModalCompanyId);
-  const companyContacts = contacts.filter((ct) => ct.companyId === activeModalCompanyId);
+  const activeCompany = companiasLocales.find((c) => c.id === activeModalCompanyId);
+  const companyContacts = contactosLocales.filter((ct) => ct.companyId === activeModalCompanyId);
   const companyDeals = deals.filter((d) => d.companyId === activeModalCompanyId);
   const companyActivities = activities.filter((a) => a.companyId === activeModalCompanyId);
+
+  // Registro manual de una nueva institución educativa en Supabase
+  const manejarCrearUniversidadManual = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formUnivNombre.trim()) return;
+
+    setGuardandoNuevaUniversidad(true);
+    try {
+      const matriculaNum = formUnivMatricula.trim() ? Number(formUnivMatricula) : 0;
+      const colegiaturaNum = formUnivColegiatura.trim() ? Number(formUnivColegiatura) : 0;
+
+      const nuevaEscuelaData = {
+        nombre: formUnivNombre.trim(),
+        tipo: formUnivTipo,
+        estado: formUnivEstado,
+        municipio: formUnivMunicipio.trim() || (formUnivEstado === 'CDMX' ? 'Cuauhtémoc' : 'Naucalpan de Juárez'),
+        direccion: formUnivDireccion.trim() || `${formUnivMunicipio || 'Centro'}, ${formUnivEstado}`,
+        modalidad_preferida: formUnivModalidad,
+        telefono: formUnivTelefono.trim() || null,
+        correo_electronico: formUnivEmail.trim() || null,
+        director_nombre: formUnivDirector.trim() || null,
+        matricula_estudiantes: isNaN(matriculaNum) ? 0 : matriculaNum,
+        colegiatura_mensual: isNaN(colegiaturaNum) ? 0 : colegiaturaNum,
+        puntuacion_prioridad: 0,
+        estatus: 'prospecto',
+        etiquetas: ['Registro Manual'],
+        marcas_aliadas: ['Develop Academy'],
+        datos_adicionales: { origen: 'registro_manual_directorio' }
+      };
+
+      const res = await insertarUniversidadesEnBD([nuevaEscuelaData]);
+      if (res.exito && res.universidades.length > 0) {
+        setCompaniasLocales((prev) => [...res.universidades, ...prev]);
+        if (onImportCompanies) {
+          onImportCompanies(res.universidades);
+        }
+        setMensajeExitoImportacion(`¡Se registró exitosamente "${formUnivNombre}" en la base de datos!`);
+        setModalRegistroManualAbierto(false);
+        // Reset campos
+        setFormUnivNombre('');
+        setFormUnivMunicipio('');
+        setFormUnivDireccion('');
+        setFormUnivTelefono('');
+        setFormUnivEmail('');
+        setFormUnivDirector('');
+        setFormUnivMatricula('');
+        setFormUnivColegiatura('');
+        setTimeout(() => setMensajeExitoImportacion(null), 6000);
+      }
+    } catch (error) {
+      console.error('Error registrando universidad manual:', error);
+    } finally {
+      setGuardandoNuevaUniversidad(false);
+    }
+  };
+
+  // Registro manual de contacto institucional dentro del expediente 360
+  const manejarCrearContactoManual = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeModalCompanyId || !formContactoNombre.trim() || !formContactoCorreo.trim()) return;
+
+    setGuardandoNuevoContacto(true);
+    try {
+      const res = await guardarContactoUniversidadEnBD({
+        universidad_id: activeModalCompanyId,
+        nombre_completo: formContactoNombre.trim(),
+        cargo_puesto: formContactoCargo.trim() || 'Coordinador(a) de Vinculación',
+        correo_electronico: formContactoCorreo.trim(),
+        telefono: formContactoTelefono.trim() || undefined,
+        es_contacto_principal: companyContacts.length === 0
+      });
+
+      if (res.exito && res.contactoFrontend) {
+        setContactosLocales((prev) => [res.contactoFrontend!, ...prev]);
+        if (onAddContact) {
+          onAddContact(res.contactoFrontend);
+        }
+        onAddActivity({
+          companyId: activeModalCompanyId,
+          type: 'task',
+          title: `Nuevo Contacto Registrado: ${formContactoNombre}`,
+          description: `${formContactoCargo || 'Contacto'} añadido al directorio del plantel. Correo: ${formContactoCorreo}.`,
+          date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+          completed: true,
+          author: 'Carlos Mendoza'
+        });
+
+        setFormularioNuevoContactoAbierto(false);
+        setFormContactoNombre('');
+        setFormContactoCargo('');
+        setFormContactoCorreo('');
+        setFormContactoTelefono('');
+      }
+    } catch (error) {
+      console.error('Error guardando contacto en expediente:', error);
+    } finally {
+      setGuardandoNuevoContacto(false);
+    }
+  };
 
   const handleCreateActivity = (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,17 +372,28 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
           <div className="text-xs text-[#888888] font-medium">
-            Total: <strong className="text-[#0f094f] font-bold">{companies.length} instituciones</strong> en red
+            Total: <strong className="text-[#0f094f] font-bold">{companiasLocales.length} instituciones</strong> en red
           </div>
 
-          <button
-            type="button"
-            onClick={() => setModalImportarAbierto(true)}
-            className="btn-primary-develop text-xs px-3.5 py-2 rounded-xl font-bold flex items-center gap-2 shadow-develop-glow transition-all"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-[#a78bfa]" />
-            <span>Importar Excel / CSV</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setModalRegistroManualAbierto(true)}
+              className="btn-secondary-light text-xs px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 border border-black/10 hover:border-[#29008e]/30 transition-all shadow-xs"
+            >
+              <Plus className="w-4 h-4 text-[#29008e]" />
+              <span>Nueva Universidad</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setModalImportarAbierto(true)}
+              className="btn-primary-develop text-xs px-3.5 py-2 rounded-xl font-bold flex items-center gap-2 shadow-develop-glow transition-all"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-[#a78bfa]" />
+              <span>Importar Excel / CSV</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -200,7 +445,7 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
       </div>
 
       {/* VISTA VACÍA O GRID DE ESCUELAS CON CARDS CLARAS DEVELOP */}
-      {companies.length === 0 ? (
+      {companiasLocales.length === 0 ? (
         <div className="card-light p-8 sm:p-12 text-center rounded-[32px] border border-black/10 bg-white shadow-xs max-w-3xl mx-auto my-6 animate-fadeIn">
           <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#0f094f]/10 via-[#29008e]/10 to-[#640354]/10 text-[#0f094f] flex items-center justify-center mx-auto mb-6 border border-[#29008e]/20 shadow-develop-glow/20">
             <Building2 className="w-10 h-10 text-[#29008e]" />
@@ -298,14 +543,20 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
                       <span className="text-[#888888] block text-[10px] font-semibold uppercase tracking-wider">Matrícula</span>
                       <span className="font-extrabold text-[#111111] flex items-center gap-1 mt-0.5">
                         <Users className="w-3 h-3 text-[#29008e]" />
-                        {school.studentCount.toLocaleString('es-MX')} alumnos
+                        {school.studentCount > 0 ? `${school.studentCount.toLocaleString('es-MX')} alumnos` : 'Sin registrar'}
                       </span>
                     </div>
                     <div>
                       <span className="text-[#888888] block text-[10px] font-semibold uppercase tracking-wider">Colegiatura</span>
-                      <span className="font-extrabold text-[#111111] block mt-0.5">
-                        ${school.monthlyTuition.toLocaleString('es-MX')}/mes
-                      </span>
+                      {school.monthlyTuition && school.monthlyTuition > 0 ? (
+                        <span className="font-extrabold text-[#111111] block mt-0.5">
+                          ${school.monthlyTuition.toLocaleString('es-MX')}/mes
+                        </span>
+                      ) : (
+                        <span className="inline-block text-[10px] font-bold text-[#29008e] bg-[#29008e]/10 px-2 py-0.5 rounded-md mt-0.5">
+                          Pública / Sin colegiatura
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -402,6 +653,15 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
               </div>
 
               <div className="relative z-10 flex items-center gap-2 sm:gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => abrirModalEdicion(activeCompany)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/20 transition-all shadow-xs"
+                >
+                  <Edit3 className="w-3.5 h-3.5 text-[#a78bfa]" />
+                  <span>Editar Datos</span>
+                </button>
+
                 {onNavigateToRoutePlanner && (
                   <button
                     onClick={() => {
@@ -448,14 +708,22 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
                         {activeCompany.email}
                       </a>
                     </div>
-                    <div className="pt-2 border-t border-black/5 flex justify-between">
+                    <div className="pt-2 border-t border-black/5 flex justify-between items-center">
                       <div>
                         <span className="text-[#888888] block text-[10px] font-semibold uppercase">Matrícula</span>
-                        <span className="font-bold text-[#111111]">{activeCompany.studentCount.toLocaleString('es-MX')} alumnos</span>
+                        <span className="font-bold text-[#111111]">
+                          {activeCompany.studentCount > 0 ? `${activeCompany.studentCount.toLocaleString('es-MX')} alumnos` : 'Sin registrar'}
+                        </span>
                       </div>
-                      <div>
+                      <div className="text-right">
                         <span className="text-[#888888] block text-[10px] font-semibold uppercase">Colegiatura</span>
-                        <span className="font-bold text-[#111111]">${activeCompany.monthlyTuition.toLocaleString('es-MX')}</span>
+                        {activeCompany.monthlyTuition && activeCompany.monthlyTuition > 0 ? (
+                          <span className="font-bold text-[#111111]">${activeCompany.monthlyTuition.toLocaleString('es-MX')}/mes</span>
+                        ) : (
+                          <span className="inline-block text-[10px] font-bold text-[#29008e] bg-[#29008e]/10 px-2 py-0.5 rounded-md">
+                            Pública / Sin colegiatura
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -492,24 +760,121 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
 
                 {/* Contactos Clave */}
                 <div>
-                  <h4 className="text-[10px] font-bold uppercase text-[#888888] tracking-widest mb-2.5">
-                    Contactos Clave ({companyContacts.length})
-                  </h4>
+                  <div className="flex items-center justify-between mb-2.5">
+                    <h4 className="text-[10px] font-bold uppercase text-[#888888] tracking-widest">
+                      Contactos Clave ({companyContacts.length})
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => setFormularioNuevoContactoAbierto(!formularioNuevoContactoAbierto)}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-[#29008e] hover:text-[#0f094f] px-2 py-0.5 rounded-lg bg-[#29008e]/5 hover:bg-[#29008e]/10 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>{formularioNuevoContactoAbierto ? 'Cancelar' : 'Agregar Contacto'}</span>
+                    </button>
+                  </div>
+
+                  {/* Formulario Inline para nuevo contacto */}
+                  {formularioNuevoContactoAbierto && (
+                    <form onSubmit={manejarCrearContactoManual} className="card-light p-3.5 mb-3 rounded-2xl border border-[#29008e]/20 space-y-2.5 bg-[#f8f8fc]/80 shadow-xs animate-fadeIn">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-[#0f094f] flex items-center gap-1.5">
+                          <UserPlus className="w-3.5 h-3.5 text-[#29008e]" />
+                          Nuevo Contacto en BD
+                        </span>
+                        <span className="text-[9px] text-[#29008e] font-semibold bg-[#29008e]/10 px-1.5 py-0.5 rounded">
+                          PostgreSQL
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          required
+                          placeholder="Nombre y Apellidos *"
+                          value={formContactoNombre}
+                          onChange={(e) => setFormContactoNombre(e.target.value)}
+                          className="w-full text-xs px-3 py-1.5 rounded-xl border border-black/10 bg-white focus:outline-none focus:border-[#29008e]"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Cargo / Puesto (ej: Dir. de Vinculación)"
+                          value={formContactoCargo}
+                          onChange={(e) => setFormContactoCargo(e.target.value)}
+                          className="w-full text-xs px-3 py-1.5 rounded-xl border border-black/10 bg-white focus:outline-none focus:border-[#29008e]"
+                        />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <input
+                            type="email"
+                            required
+                            placeholder="Correo electrónico *"
+                            value={formContactoCorreo}
+                            onChange={(e) => setFormContactoCorreo(e.target.value)}
+                            className="w-full text-xs px-3 py-1.5 rounded-xl border border-black/10 bg-white focus:outline-none focus:border-[#29008e]"
+                          />
+                          <input
+                            type="tel"
+                            placeholder="Teléfono (opcional)"
+                            value={formContactoTelefono}
+                            onChange={(e) => setFormContactoTelefono(e.target.value)}
+                            className="w-full text-xs px-3 py-1.5 rounded-xl border border-black/10 bg-white focus:outline-none focus:border-[#29008e]"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-end gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setFormularioNuevoContactoAbierto(false)}
+                          className="text-xs px-2.5 py-1 text-[#555555] hover:text-[#111111]"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={guardandoNuevoContacto}
+                          className="btn-primary-develop text-xs px-3 py-1 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                          {guardandoNuevoContacto ? (
+                            <>
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                              <span>Guardando...</span>
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="w-3 h-3" />
+                              <span>Guardar Contacto</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
                   <div className="space-y-2.5">
                     {companyContacts.map((contact) => (
                       <div key={contact.id} className="card-light p-3 text-xs flex items-center gap-3 rounded-2xl">
                         <img
                           src={contact.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
                           alt={contact.name}
-                          className="w-10 h-10 rounded-xl object-cover border border-black/10"
+                          className="w-10 h-10 rounded-xl object-cover border border-black/10 shrink-0"
                         />
                         <div className="flex-1 min-w-0">
                           <div className="font-bold text-[#111111] truncate">{contact.name}</div>
                           <div className="text-[11px] text-[#555555] truncate">{contact.role}</div>
                           <div className="text-[10px] text-[#29008e] truncate font-medium">{contact.email}</div>
+                          {contact.phone && (
+                            <div className="text-[10px] text-[#888888] truncate flex items-center gap-1 mt-0.5">
+                              <Phone className="w-2.5 h-2.5" />
+                              <span>{contact.phone}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
+                    {companyContacts.length === 0 && !formularioNuevoContactoAbierto && (
+                      <div className="text-xs text-[#888888] card-light p-4 text-center rounded-2xl">
+                        No hay contactos registrados aún. Haz clic en "Agregar Contacto" para registrar uno.
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -631,6 +996,431 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
         alCerrar={() => setModalImportarAbierto(false)}
         alConfirmarImportacion={manejarImportacionUniversidades}
       />
+
+      {/* MODAL DE REGISTRO MANUAL DE NUEVA UNIVERSIDAD (POSTGRESQL) */}
+      {modalRegistroManualAbierto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-[#07052e]/80 backdrop-blur-md animate-fadeIn">
+          <div className="bg-white w-full max-w-2xl rounded-[24px] shadow-develop-modal border border-white/20 flex flex-col max-h-[92vh] overflow-hidden">
+            {/* Header del Modal */}
+            <div className="px-6 py-4 border-b border-black/10 flex items-center justify-between bg-gradient-to-r from-[#07052e] via-[#0f094f] to-[#12063b] text-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#29008e] to-[#640354] flex items-center justify-center shadow-develop-box border border-white/15">
+                  <Building2 className="w-5 h-5 text-[#a78bfa]" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a78bfa]">
+                      Directorio 360° PAP
+                    </span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    <span className="text-[10px] text-white/60">PostgreSQL Oficial</span>
+                  </div>
+                  <h2 className="text-lg font-bold text-white tracking-tight">
+                    Registrar Nueva Institución Educativa
+                  </h2>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setModalRegistroManualAbierto(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors text-white/80 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Formulario de Registro */}
+            <form onSubmit={manejarCrearUniversidadManual} className="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+              <div className="space-y-1.5">
+                <label className="font-bold text-[#111111] flex items-center gap-1">
+                  <span>Nombre de la Institución</span>
+                  <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="ej. Universidad Autónoma Metropolitana - Unidad Azcapotzalco"
+                  value={formUnivNombre}
+                  onChange={(e) => setFormUnivNombre(e.target.value)}
+                  className="input-develop w-full px-3.5 py-2.5 rounded-xl border border-black/10 focus:border-[#29008e] text-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="font-bold text-[#111111]">Tipo de Plantel</label>
+                  <select
+                    value={formUnivTipo}
+                    onChange={(e) => setFormUnivTipo(e.target.value as CompanyType)}
+                    className="input-develop w-full px-3.5 py-2 rounded-xl border border-black/10 text-xs bg-white cursor-pointer"
+                  >
+                    <option value="universidad">Universidad</option>
+                    <option value="instituto">Instituto Tecnológico / Superior</option>
+                    <option value="colegio">Colegio / Centro de Estudios</option>
+                    <option value="preparatoria">Preparatoria / Bachillerato</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-[#111111]">Modalidad Preferida PAP</label>
+                  <select
+                    value={formUnivModalidad}
+                    onChange={(e) => setFormUnivModalidad(e.target.value as ProjectModality)}
+                    className="input-develop w-full px-3.5 py-2 rounded-xl border border-black/10 text-xs bg-white cursor-pointer"
+                  >
+                    <option value="modalidad_a_programa">Modalidad A (Programa / Conferencia)</option>
+                    <option value="modalidad_b_completa">Modalidad B (Feria Completa / Stand)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="font-bold text-[#111111]">Entidad Federativa (Estado)</label>
+                  <select
+                    value={formUnivEstado}
+                    onChange={(e) => setFormUnivEstado(e.target.value as 'CDMX' | 'Estado de México')}
+                    className="input-develop w-full px-3.5 py-2 rounded-xl border border-black/10 text-xs bg-white cursor-pointer"
+                  >
+                    <option value="CDMX">Ciudad de México (CDMX)</option>
+                    <option value="Estado de México">Estado de México (Edomex)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-[#111111]">Alcaldía / Municipio</label>
+                  <input
+                    type="text"
+                    placeholder="ej. Benito Juárez, Coyoacán, Naucalpan"
+                    value={formUnivMunicipio}
+                    onChange={(e) => setFormUnivMunicipio(e.target.value)}
+                    className="input-develop w-full px-3.5 py-2 rounded-xl border border-black/10 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-[#111111]">Dirección Completa / Campus</label>
+                <input
+                  type="text"
+                  placeholder="ej. Av. San Pablo 180, Col. Reynosa Tamaulipas, C.P. 02200"
+                  value={formUnivDireccion}
+                  onChange={(e) => setFormUnivDireccion(e.target.value)}
+                  className="input-develop w-full px-3.5 py-2 rounded-xl border border-black/10 text-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <label className="font-bold text-[#111111]">Director(a) / Rector(a)</label>
+                  <input
+                    type="text"
+                    placeholder="ej. Dra. María López"
+                    value={formUnivDirector}
+                    onChange={(e) => setFormUnivDirector(e.target.value)}
+                    className="input-develop w-full px-3 py-2 rounded-xl border border-black/10 text-xs"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-[#111111]">Correo Institucional</label>
+                  <input
+                    type="email"
+                    placeholder="ej. contacto@universidad.edu.mx"
+                    value={formUnivEmail}
+                    onChange={(e) => setFormUnivEmail(e.target.value)}
+                    className="input-develop w-full px-3 py-2 rounded-xl border border-black/10 text-xs"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-[#111111]">Teléfono de Contacto</label>
+                  <input
+                    type="tel"
+                    placeholder="ej. 55 5318 9000"
+                    value={formUnivTelefono}
+                    onChange={(e) => setFormUnivTelefono(e.target.value)}
+                    className="input-develop w-full px-3 py-2 rounded-xl border border-black/10 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="font-bold text-[#111111]">Matrícula de Estudiantes</label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="ej. 3500 o dejar en blanco"
+                    value={formUnivMatricula}
+                    onChange={(e) => setFormUnivMatricula(e.target.value)}
+                    className="input-develop w-full px-3.5 py-2 rounded-xl border border-black/10 text-xs"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-[#111111]">Colegiatura Mensual (MXN)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="0 si es pública o dejar en blanco"
+                    value={formUnivColegiatura}
+                    onChange={(e) => setFormUnivColegiatura(e.target.value)}
+                    className="input-develop w-full px-3.5 py-2 rounded-xl border border-black/10 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-black/5 flex items-center justify-between">
+                <div className="text-[11px] text-[#888888] flex items-center gap-1.5">
+                  <Database className="w-3.5 h-3.5 text-[#29008e]" />
+                  <span>Se sincronizará en la tabla <code className="text-[#0f094f] font-mono">universidades</code></span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalRegistroManualAbierto(false)}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-[#555555] hover:bg-black/5 transition-all"
+                  >
+                    Cancelar
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={guardandoNuevaUniversidad}
+                    className="btn-primary-develop px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-develop-glow transition-all disabled:opacity-50"
+                  >
+                    {guardandoNuevaUniversidad ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Guardando en PostgreSQL...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-4 h-4" />
+                        <span>Guardar Universidad</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE EDICIÓN DE UNIVERSIDAD (SUPABASE POSTGRESQL) */}
+      {modalEdicionAbierto && activeCompany && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-5 bg-[#07052e]/80 backdrop-blur-md animate-fadeIn">
+          <div className="bg-white w-full max-w-2xl rounded-[24px] shadow-develop-modal border border-white/20 flex flex-col max-h-[92vh] overflow-hidden">
+            {/* Header del Modal */}
+            <div className="px-6 py-4 border-b border-black/10 flex items-center justify-between bg-gradient-to-r from-[#07052e] via-[#0f094f] to-[#12063b] text-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#29008e] to-[#640354] flex items-center justify-center shadow-develop-box border border-white/15">
+                  <Edit3 className="w-5 h-5 text-[#a78bfa]" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a78bfa]">
+                      Directorio 360° PAP
+                    </span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    <span className="text-[10px] text-white/60">Actualización en PostgreSQL</span>
+                  </div>
+                  <h2 className="text-lg font-bold text-white tracking-tight">
+                    Editar Institución Educativa
+                  </h2>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setModalEdicionAbierto(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors text-white/80 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Formulario de Edición */}
+            <form onSubmit={manejarGuardarEdicion} className="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+              <div className="space-y-1.5">
+                <label className="font-bold text-[#111111] flex items-center gap-1">
+                  <span>Nombre de la Institución</span>
+                  <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formEditNombre}
+                  onChange={(e) => setFormEditNombre(e.target.value)}
+                  className="input-develop w-full px-3.5 py-2.5 rounded-xl border border-black/10 focus:border-[#29008e] text-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="font-bold text-[#111111]">Tipo de Plantel</label>
+                  <select
+                    value={formEditTipo}
+                    onChange={(e) => setFormEditTipo(e.target.value as CompanyType)}
+                    className="input-develop w-full px-3.5 py-2 rounded-xl border border-black/10 text-xs bg-white cursor-pointer"
+                  >
+                    <option value="universidad">Universidad</option>
+                    <option value="instituto">Instituto Tecnológico / Superior</option>
+                    <option value="colegio">Colegio / Centro de Estudios</option>
+                    <option value="preparatoria">Preparatoria / Bachillerato</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-[#111111]">Modalidad Preferida PAP</label>
+                  <select
+                    value={formEditModalidad}
+                    onChange={(e) => setFormEditModalidad(e.target.value as ProjectModality)}
+                    className="input-develop w-full px-3.5 py-2 rounded-xl border border-black/10 text-xs bg-white cursor-pointer"
+                  >
+                    <option value="modalidad_a_programa">Modalidad A (Programa / Conferencia)</option>
+                    <option value="modalidad_b_completa">Modalidad B (Feria Completa / Escuela)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="font-bold text-[#111111]">Entidad Federativa (Estado)</label>
+                  <select
+                    value={formEditEstado}
+                    onChange={(e) => setFormEditEstado(e.target.value as 'CDMX' | 'Estado de México')}
+                    className="input-develop w-full px-3.5 py-2 rounded-xl border border-black/10 text-xs bg-white cursor-pointer"
+                  >
+                    <option value="CDMX">Ciudad de México (CDMX)</option>
+                    <option value="Estado de México">Estado de México (Edomex)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-[#111111]">Alcaldía / Municipio</label>
+                  <input
+                    type="text"
+                    value={formEditMunicipio}
+                    onChange={(e) => setFormEditMunicipio(e.target.value)}
+                    className="input-develop w-full px-3.5 py-2 rounded-xl border border-black/10 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-[#111111]">Dirección Completa / Campus</label>
+                <input
+                  type="text"
+                  value={formEditDireccion}
+                  onChange={(e) => setFormEditDireccion(e.target.value)}
+                  className="input-develop w-full px-3.5 py-2 rounded-xl border border-black/10 text-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <label className="font-bold text-[#111111]">Director(a) / Rector(a)</label>
+                  <input
+                    type="text"
+                    placeholder="ej. Dra. María López"
+                    value={formEditDirector}
+                    onChange={(e) => setFormEditDirector(e.target.value)}
+                    className="input-develop w-full px-3 py-2 rounded-xl border border-black/10 text-xs"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-[#111111]">Correo Institucional</label>
+                  <input
+                    type="email"
+                    placeholder="contacto@universidad.edu.mx"
+                    value={formEditEmail}
+                    onChange={(e) => setFormEditEmail(e.target.value)}
+                    className="input-develop w-full px-3 py-2 rounded-xl border border-black/10 text-xs"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-[#111111]">Teléfono Institucional</label>
+                  <input
+                    type="tel"
+                    placeholder="55 5318 9000"
+                    value={formEditTelefono}
+                    onChange={(e) => setFormEditTelefono(e.target.value)}
+                    className="input-develop w-full px-3 py-2 rounded-xl border border-black/10 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="font-bold text-[#111111]">Matrícula de Estudiantes</label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="ej. 3500 o dejar en blanco"
+                    value={formEditMatricula}
+                    onChange={(e) => setFormEditMatricula(e.target.value)}
+                    className="input-develop w-full px-3.5 py-2 rounded-xl border border-black/10 text-xs"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-bold text-[#111111]">Colegiatura Mensual (MXN)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="0 si es pública o dejar en blanco"
+                    value={formEditColegiatura}
+                    onChange={(e) => setFormEditColegiatura(e.target.value)}
+                    className="input-develop w-full px-3.5 py-2 rounded-xl border border-black/10 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-black/5 flex items-center justify-between">
+                <div className="text-[11px] text-[#888888] flex items-center gap-1.5">
+                  <Database className="w-3.5 h-3.5 text-[#29008e]" />
+                  <span>Se actualizará en la tabla <code className="text-[#0f094f] font-mono">universidades</code></span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalEdicionAbierto(false)}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-[#555555] hover:bg-black/5 transition-all"
+                  >
+                    Cancelar
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={guardandoEdicion}
+                    className="btn-primary-develop px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-develop-glow transition-all disabled:opacity-50"
+                  >
+                    {guardandoEdicion ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Guardando en PostgreSQL...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-4 h-4" />
+                        <span>Guardar Cambios</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

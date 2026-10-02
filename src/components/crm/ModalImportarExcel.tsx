@@ -32,6 +32,7 @@ import {
   CampoCanonico
 } from '../../utils/lectorExcelUniversidades';
 import { Universidad } from '../../types/base_datos';
+import { insertarUniversidadesEnBD } from '../../services/servicioCrm';
 
 interface PropiedadesModalImportarExcel {
   estaAbierto: boolean;
@@ -72,6 +73,7 @@ export const ModalImportarExcel: React.FC<PropiedadesModalImportarExcel> = ({
 }) => {
   const [estaArrastrando, setEstaArrastrando] = useState(false);
   const [estaProcesando, setEstaProcesando] = useState(false);
+  const [estaInsertandoEnBd, setEstaInsertandoEnBd] = useState(false);
   const [mensajeError, setMensajeError] = useState<string | null>(null);
   const [resultadoLectura, setResultadoLectura] = useState<ResultadoLecturaExcel | null>(null);
   const [mapeoActual, setMapeoActual] = useState<MapeoColumnas>({});
@@ -166,7 +168,7 @@ export const ModalImportarExcel: React.FC<PropiedadesModalImportarExcel> = ({
   };
 
   // Confirmar e importar instituciones válidas y con advertencias (excluyendo inválidas sin nombre)
-  const manejarConfirmar = () => {
+  const manejarConfirmar = async () => {
     if (!resultadoLectura) return;
 
     const institucionesAceptables = resultadoLectura.universidades
@@ -178,8 +180,22 @@ export const ModalImportarExcel: React.FC<PropiedadesModalImportarExcel> = ({
       return;
     }
 
-    alConfirmarImportacion(institucionesAceptables);
-    alCerrar();
+    setEstaInsertandoEnBd(true);
+    setMensajeError(null);
+
+    try {
+      const res = await insertarUniversidadesEnBD(institucionesAceptables);
+      if (res.exito) {
+        alConfirmarImportacion(institucionesAceptables);
+        alCerrar();
+      } else {
+        setMensajeError(`Aviso al insertar en base de datos: ${res.error || 'Verifica la conexión con PostgreSQL'}`);
+      }
+    } catch (err: any) {
+      setMensajeError(`Error al insertar en base de datos: ${err?.message || 'Error desconocido'}`);
+    } finally {
+      setEstaInsertandoEnBd(false);
+    }
   };
 
   const universidadesFiltradas = resultadoLectura
@@ -616,16 +632,31 @@ export const ModalImportarExcel: React.FC<PropiedadesModalImportarExcel> = ({
 
             <button
               type="button"
-              disabled={!resultadoLectura || (resultadoLectura.resumen.validas + resultadoLectura.resumen.conAdvertencias) === 0}
+              disabled={
+                estaInsertandoEnBd ||
+                !resultadoLectura ||
+                (resultadoLectura.resumen.validas + resultadoLectura.resumen.conAdvertencias) === 0
+              }
               onClick={manejarConfirmar}
               className={`text-xs px-5 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all w-full sm:w-auto ${
-                !resultadoLectura || (resultadoLectura.resumen.validas + resultadoLectura.resumen.conAdvertencias) === 0
+                estaInsertandoEnBd ||
+                !resultadoLectura ||
+                (resultadoLectura.resumen.validas + resultadoLectura.resumen.conAdvertencias) === 0
                   ? 'bg-black/10 text-black/30 cursor-not-allowed'
                   : 'btn-primary-develop shadow-develop-glow'
               }`}
             >
-              <Building2 className="w-4 h-4 text-[#a78bfa]" />
-              Importar a Cartera de Universidades
+              {estaInsertandoEnBd ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin text-[#a78bfa]" />
+                  <span>Guardando en PostgreSQL...</span>
+                </>
+              ) : (
+                <>
+                  <Building2 className="w-4 h-4 text-[#a78bfa]" />
+                  <span>Importar a Cartera de Universidades</span>
+                </>
+              )}
             </button>
           </div>
         </div>

@@ -11,6 +11,8 @@ import { clienteSupabase, verificarConexionSupabase } from './clienteSupabase';
 import {
   Universidad,
   UniversidadInsercion,
+  UniversidadActualizacion,
+  ContactoUniversidad,
   ContactoUniversidadInsercion,
   Oportunidad,
   OportunidadInsercion,
@@ -83,6 +85,20 @@ export function esUuidValido(id: string): boolean {
 }
 
 /**
+ * Genera un UUID estándar v4 compatible con PostgreSQL.
+ */
+export function generarUuid(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+/**
  * Mapea una entidad canónica de base de datos 'Universidad' al tipo 'Company' del frontend.
  */
 export function mapearUniversidadACompany(u: Universidad): Company {
@@ -90,6 +106,18 @@ export function mapearUniversidadACompany(u: Universidad): Company {
     u.estado?.toLowerCase().includes('cdmx') || u.estado?.toLowerCase().includes('ciudad de')
       ? 'CDMX'
       : 'Estado de México';
+
+  const correoFinal = u.correo_electronico && u.correo_electronico.trim() !== '' 
+    ? u.correo_electronico.trim() 
+    : 'Sin correo registrado';
+
+  const telefonoFinal = u.telefono && u.telefono.trim() !== '' 
+    ? u.telefono.trim() 
+    : 'Sin teléfono registrado';
+
+  const directorFinal = u.director_nombre && u.director_nombre.trim() !== '' 
+    ? u.director_nombre.trim() 
+    : 'Sin titular registrado';
 
   return {
     id: u.id,
@@ -100,12 +128,12 @@ export function mapearUniversidadACompany(u: Universidad): Company {
     address: u.direccion || '',
     lat: Number(u.latitud || 19.4326),
     lng: Number(u.longitud || -99.1332),
-    phone: u.telefono || 'Sin teléfono',
-    email: u.correo_electronico || 'vinculacion@universidad.edu.mx',
-    directorName: u.director_nombre || 'Por confirmar',
+    phone: telefonoFinal,
+    email: correoFinal,
+    directorName: directorFinal,
     studentCount: u.matricula_estudiantes ?? 0,
     monthlyTuition: Number(u.colegiatura_mensual ?? 0),
-    leadScore: u.puntuacion_prioridad ?? 50,
+    leadScore: u.puntuacion_prioridad ?? 0,
     status: (u.estatus as any) || 'prospecto',
     tags: u.etiquetas && u.etiquetas.length > 0 ? u.etiquetas : ['Institución Educativa'],
     preferredModality: (u.modalidad_preferida as any) || 'modalidad_a_programa',
@@ -207,6 +235,313 @@ export async function obtenerUniversidadesDesdeBD(): Promise<Company[]> {
   }
 
   return [];
+}
+
+/**
+ * Inserta un lote de nuevas instituciones educativas en PostgreSQL vía Supabase.
+ * - Garantiza asignación de UUIDs válidos.
+ * - Normaliza campos canónicos obligatorios y opcionales.
+ * - Empaqueta cualquier columna adicional no contemplada en 'datos_adicionales JSONB'.
+ * - Actualiza el respaldo en localStorage.
+ */
+export async function insertarUniversidadesEnBD(nuevasUniversidades: any[]): Promise<{
+  exito: boolean;
+  totalInsertadas: number;
+  universidades: Company[];
+  error?: string;
+}> {
+  if (!nuevasUniversidades || nuevasUniversidades.length === 0) {
+    return { exito: true, totalInsertadas: 0, universidades: [] };
+  }
+
+  const filasAInsertar: UniversidadInsercion[] = nuevasUniversidades.map((item) => {
+    // 1. UUID válido
+    let idFinal = item.id;
+    if (!idFinal || !esUuidValido(idFinal)) {
+      idFinal = MAPA_UUID_ESCUELAS[idFinal] || generarUuid();
+    }
+
+    // 2. Normalizar Estado
+    const estadoRaw = String(item.estado || item.state || 'CDMX');
+    const estadoNormalizado: string =
+      estadoRaw.toLowerCase().includes('mex') || estadoRaw.toLowerCase().includes('méx')
+        ? 'Estado de México'
+        : 'CDMX';
+
+    // 3. Normalizar Coordenadas
+    let lat = Number(item.latitud ?? item.lat);
+    let lng = Number(item.longitud ?? item.lng);
+    if (isNaN(lat) || lat === 0) {
+      lat = estadoNormalizado === 'CDMX' ? 19.4326 : 19.5358;
+    }
+    if (isNaN(lng) || lng === 0) {
+      lng = estadoNormalizado === 'CDMX' ? -99.1332 : -99.2045;
+    }
+
+    // 4. Normalizar Tipo
+    const tiposPermitidos = ['universidad', 'instituto_tecnologico', 'universidad_tecnologica', 'colegio', 'empresa_asociada'];
+    const tipoFinal = tiposPermitidos.includes(item.tipo || item.type)
+      ? (item.tipo || item.type)
+      : 'universidad';
+
+    // 5. Normalizar Modalidad
+    const modRaw = item.modalidad_preferida || item.preferredModality;
+    const modalidadFinal =
+      modRaw === 'modalidad_b_escuela' || modRaw === 'modalidad_b'
+        ? 'modalidad_b_escuela'
+        : 'modalidad_a_programa';
+
+    // 6. Normalizar Estatus
+    const estatusPermitidos = ['prospecto', 'cliente_activo', 'en_seguimiento', 'inactivo'];
+    const estatusFinal = estatusPermitidos.includes(item.estatus || item.status)
+      ? (item.estatus || item.status)
+      : 'prospecto';
+
+    // 7. Empaquetar columnas adicionales en datos_adicionales JSONB
+    const datosAdicionales: Record<string, any> = { ...(item.datos_adicionales || {}) };
+    const camposConocidos = new Set([
+      'id', 'nombre', 'name', 'clave_cct', 'cct', 'tipo', 'type', 'estado', 'state',
+      'municipio', 'municipality', 'direccion', 'address', 'codigo_postal',
+      'latitud', 'lat', 'longitud', 'lng', 'telefono', 'phone', 'correo_electronico', 'email',
+      'director_nombre', 'directorName', 'matricula_estudiantes', 'studentCount',
+      'colegiatura_mensual', 'monthlyTuition', 'puntuacion_prioridad', 'leadScore',
+      'estatus', 'status', 'modalidad_preferida', 'preferredModality', 'etiquetas', 'tags',
+      'marcas_aliadas', 'alliedBrands', 'datos_adicionales', 'creado_en', 'actualizado_en',
+      'indiceFila', 'estadoValidacion', 'advertencias', 'datos', 'datosOriginales'
+    ]);
+
+    Object.keys(item).forEach((clave) => {
+      if (!camposConocidos.has(clave) && item[clave] !== undefined) {
+        datosAdicionales[clave] = item[clave];
+      }
+    });
+
+    return {
+      id: idFinal,
+      nombre: String(item.nombre || item.name || 'Institución Sin Nombre').trim(),
+      clave_cct: item.clave_cct || item.cct || null,
+      tipo: tipoFinal,
+      estado: estadoNormalizado,
+      municipio: String(item.municipio || item.municipality || 'Sin municipio').trim(),
+      direccion: String(item.direccion || item.address || 'Dirección no registrada').trim(),
+      codigo_postal: item.codigo_postal || null,
+      latitud: lat,
+      longitud: lng,
+      telefono: item.telefono || item.phone || null,
+      correo_electronico: item.correo_electronico || item.email || null,
+      sitio_web: item.sitio_web || null,
+      director_nombre: item.director_nombre || item.directorName || null,
+      matricula_estudiantes: item.matricula_estudiantes ?? item.studentCount ?? 0,
+      colegiatura_mensual: item.colegiatura_mensual ?? item.monthlyTuition ?? 0,
+      puntuacion_prioridad: item.puntuacion_prioridad ?? item.leadScore ?? 50,
+      estatus: estatusFinal,
+      modalidad_preferida: modalidadFinal,
+      etiquetas: Array.isArray(item.etiquetas) ? item.etiquetas : (Array.isArray(item.tags) ? item.tags : []),
+      marcas_aliadas: Array.isArray(item.marcas_aliadas) ? item.marcas_aliadas : (Array.isArray(item.alliedBrands) ? item.alliedBrands : []),
+      datos_adicionales: datosAdicionales
+    };
+  });
+
+  // 8. Inserción / Upsert en PostgreSQL vía Supabase
+  try {
+    const conexionDisponible = await verificarConexionSupabase();
+    if (conexionDisponible) {
+      const { error } = await clienteSupabase
+        .from('universidades')
+        .upsert(filasAInsertar);
+
+      if (error) {
+        console.error('Error insertando universidades en Supabase:', error);
+      }
+    }
+  } catch (error: any) {
+    console.warn('Aviso de inserción en Supabase:', error);
+  }
+
+  // 9. Mapeo a Company y actualización de almacenamiento local
+  const companiasParaFrontend: Company[] = filasAInsertar.map((u) => mapearUniversidadACompany(u as Universidad));
+  try {
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      const guardadas = localStorage.getItem(CLAVE_ALMACENAMIENTO_UNIVERSIDADES);
+      const previas: Company[] = guardadas ? JSON.parse(guardadas) : [];
+      const idsNuevos = new Set(companiasParaFrontend.map((c) => c.id));
+      const fusionadas = [...companiasParaFrontend, ...previas.filter((p) => !idsNuevos.has(p.id))];
+      localStorage.setItem(CLAVE_ALMACENAMIENTO_UNIVERSIDADES, JSON.stringify(fusionadas));
+    }
+  } catch (e) {
+    console.warn('Error sincronizando localStorage:', e);
+  }
+
+  return {
+    exito: true,
+    totalInsertadas: filasAInsertar.length,
+    universidades: companiasParaFrontend
+  };
+}
+
+/**
+ * Guarda un contacto institucional vinculado a una universidad en 'contactos_universidad'
+ * y actualiza el respaldo en memoria.
+ */
+export async function guardarContactoUniversidadEnBD(contacto: {
+  universidad_id: string;
+  nombre_completo: string;
+  cargo_puesto: string;
+  correo_electronico: string;
+  telefono?: string;
+  es_contacto_principal?: boolean;
+  avatar?: string;
+}): Promise<{
+  exito: boolean;
+  contacto?: ContactoUniversidad;
+  contactoFrontend?: Contact;
+  error?: string;
+}> {
+  const idFinal = generarUuid();
+  const filaContacto: ContactoUniversidadInsercion = {
+    id: idFinal,
+    universidad_id: contacto.universidad_id,
+    nombre_completo: contacto.nombre_completo.trim(),
+    cargo_puesto: contacto.cargo_puesto.trim(),
+    correo_electronico: contacto.correo_electronico.trim(),
+    telefono: contacto.telefono ? contacto.telefono.trim() : null,
+    es_contacto_principal: contacto.es_contacto_principal ?? false,
+    datos_adicionales: contacto.avatar ? { avatar: contacto.avatar } : {}
+  };
+
+  let contactoGuardado: ContactoUniversidad | null = null;
+
+  try {
+    const conexionDisponible = await verificarConexionSupabase();
+    if (conexionDisponible) {
+      const { data, error } = await clienteSupabase
+        .from('contactos_universidad')
+        .insert(filaContacto)
+        .select()
+        .single();
+
+      if (!error && data) {
+        contactoGuardado = data as ContactoUniversidad;
+      } else if (error) {
+        console.warn('Aviso guardando contacto en Supabase:', error);
+      }
+    }
+  } catch (error: any) {
+    console.warn('Excepción guardando contacto:', error);
+  }
+
+  const contactoFrontend: Contact = {
+    id: idFinal,
+    companyId: contacto.universidad_id,
+    name: contacto.nombre_completo,
+    role: contacto.cargo_puesto,
+    email: contacto.correo_electronico,
+    phone: contacto.telefono || 'Sin teléfono',
+    avatar: contacto.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'
+  };
+
+  return {
+    exito: true,
+    contacto: contactoGuardado || (filaContacto as any),
+    contactoFrontend
+  };
+}
+
+/**
+ * Actualiza los datos de una institución en la tabla 'universidades' y en memoria local.
+ */
+export async function actualizarUniversidadEnBD(
+  id: string,
+  cambios: any
+): Promise<{ exito: boolean; error?: string }> {
+  // Mapear cualquier propiedad enviada desde el frontend a los nombres canónicos de columnas en snake_case de PostgreSQL
+  const camposSql: UniversidadActualizacion = {};
+
+  if (cambios.nombre !== undefined || cambios.name !== undefined) {
+    camposSql.nombre = cambios.nombre || cambios.name;
+  }
+  if (cambios.director_nombre !== undefined || cambios.directorName !== undefined) {
+    camposSql.director_nombre = cambios.director_nombre !== undefined ? cambios.director_nombre : cambios.directorName;
+  }
+  if (cambios.telefono !== undefined || cambios.phone !== undefined) {
+    camposSql.telefono = cambios.telefono !== undefined ? cambios.telefono : cambios.phone;
+  }
+  if (cambios.correo_electronico !== undefined || cambios.email !== undefined) {
+    camposSql.correo_electronico = cambios.correo_electronico !== undefined ? cambios.correo_electronico : cambios.email;
+  }
+  if (cambios.matricula_estudiantes !== undefined || cambios.studentCount !== undefined) {
+    camposSql.matricula_estudiantes = cambios.matricula_estudiantes !== undefined ? cambios.matricula_estudiantes : cambios.studentCount;
+  }
+  if (cambios.colegiatura_mensual !== undefined || cambios.monthlyTuition !== undefined) {
+    camposSql.colegiatura_mensual = cambios.colegiatura_mensual !== undefined ? cambios.colegiatura_mensual : cambios.monthlyTuition;
+  }
+  if (cambios.modalidad_preferida !== undefined || cambios.preferredModality !== undefined) {
+    camposSql.modalidad_preferida = cambios.modalidad_preferida || cambios.preferredModality;
+  }
+  if (cambios.estado !== undefined || cambios.state !== undefined) {
+    camposSql.estado = cambios.estado || cambios.state;
+  }
+  if (cambios.municipio !== undefined) {
+    camposSql.municipio = cambios.municipio;
+  }
+  if (cambios.direccion !== undefined || cambios.address !== undefined) {
+    camposSql.direccion = cambios.direccion || cambios.address;
+  }
+  if (cambios.tipo !== undefined || cambios.type !== undefined) {
+    camposSql.tipo = cambios.tipo || cambios.type;
+  }
+
+  try {
+    const conexionDisponible = await verificarConexionSupabase();
+    if (conexionDisponible) {
+      const { error } = await clienteSupabase
+        .from('universidades')
+        .update(camposSql)
+        .eq('id', id);
+
+      if (error) {
+        console.warn('Error actualizando universidad en Supabase:', error);
+        return { exito: false, error: error.message };
+      }
+    }
+  } catch (error: any) {
+    console.warn('Error de conexión actualizando en Supabase:', error);
+  }
+
+  // Actualizar también en almacenamiento local de respaldo ('pap_crm_universidades_local')
+  try {
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      const guardadas = localStorage.getItem(CLAVE_ALMACENAMIENTO_UNIVERSIDADES);
+      if (guardadas) {
+        const lista: Company[] = JSON.parse(guardadas);
+        const actualizadas = lista.map((item) => {
+          if (item.id === id) {
+            return {
+              ...item,
+              ...(camposSql.nombre !== undefined && { name: camposSql.nombre }),
+              ...(camposSql.director_nombre !== undefined && { directorName: camposSql.director_nombre }),
+              ...(camposSql.telefono !== undefined && { phone: camposSql.telefono }),
+              ...(camposSql.correo_electronico !== undefined && { email: camposSql.correo_electronico }),
+              ...(camposSql.matricula_estudiantes !== undefined && { studentCount: Number(camposSql.matricula_estudiantes) }),
+              ...(camposSql.colegiatura_mensual !== undefined && { monthlyTuition: Number(camposSql.colegiatura_mensual) }),
+              ...(camposSql.modalidad_preferida !== undefined && { preferredModality: camposSql.modalidad_preferida }),
+              ...(camposSql.estado !== undefined && { state: camposSql.estado }),
+              ...(camposSql.municipio !== undefined && { municipality: camposSql.municipio }),
+              ...(camposSql.direccion !== undefined && { address: camposSql.direccion }),
+              ...(camposSql.tipo !== undefined && { type: camposSql.tipo }),
+              ...cambios
+            };
+          }
+          return item;
+        });
+        localStorage.setItem(CLAVE_ALMACENAMIENTO_UNIVERSIDADES, JSON.stringify(actualizadas));
+      }
+    }
+  } catch (e) {
+    console.warn('Error actualizando localmente:', e);
+  }
+
+  return { exito: true };
 }
 
 /**

@@ -307,7 +307,10 @@ export function App() {
   // Importar instituciones educativas desde Excel o CSV a la cartera activa
   const handleImportCompanies = async (newCompanies: Company[]) => {
     setCompanies((prev) => {
-      const actualizadas = [...newCompanies, ...prev];
+      // Filtrar para evitar duplicados por ID
+      const idsExistentes = new Set(prev.map((p) => p.id));
+      const noDuplicadas = newCompanies.filter((c) => !idsExistentes.has(c.id));
+      const actualizadas = [...noDuplicadas, ...prev];
       try {
         localStorage.setItem('pap_crm_universidades_local', JSON.stringify(actualizadas));
       } catch (e) {
@@ -316,43 +319,21 @@ export function App() {
       return actualizadas;
     });
 
-    // Persistir de forma transparente en Supabase PostgreSQL si hay conexión
+    // Actualizar el contador en el Topbar consultando Supabase PostgreSQL
     try {
       const conexionOk = await verificarConexionSupabase();
       if (conexionOk) {
-        const filas = newCompanies.map((c) => ({
-          id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : undefined,
-          nombre: c.name,
-          tipo: c.type,
-          estado: c.state,
-          municipio: c.municipality,
-          direccion: c.address,
-          latitud: c.lat,
-          longitud: c.lng,
-          telefono: c.phone,
-          correo_electronico: c.email,
-          director_nombre: c.directorName,
-          matricula_estudiantes: c.studentCount,
-          colegiatura_mensual: c.monthlyTuition,
-          puntuacion_prioridad: c.leadScore,
-          estatus: c.status,
-          etiquetas: c.tags,
-          modalidad_preferida: c.preferredModality || 'modalidad_a_programa',
-          marcas_aliadas: c.alliedBrands || []
-        }));
-
-        await clienteSupabase.from('universidades').upsert(filas as any);
         const { count } = await clienteSupabase
           .from('universidades')
           .select('*', { count: 'exact', head: true });
         
         setEstadoBd((prev) => ({
           ...prev,
-          totalUniversidades: count ?? (prev.totalUniversidades + newCompanies.length)
+          totalUniversidades: count ?? prev.totalUniversidades
         }));
       }
     } catch (e) {
-      console.warn('Error sincronizando importación con Supabase:', e);
+      console.warn('Error sincronizando contador de universidades con Supabase:', e);
     }
   };
 
@@ -774,6 +755,7 @@ export function App() {
                 onOpenCompanyDetail={(id) => setSelectedSchoolDetailId(id)}
                 onImportCompanies={handleImportCompanies}
                 onCargarSemilla={manejarCargarSemilla}
+                onAddContact={(newContact) => setContacts((prev) => [newContact, ...prev])}
               />
             )}
 
