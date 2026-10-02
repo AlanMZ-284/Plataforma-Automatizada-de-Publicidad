@@ -15,6 +15,15 @@ import { FormularioRegistroAlumnoQr } from './components/publico/FormularioRegis
 import { MarketingAutomationModule } from './components/marketing/MarketingAutomationModule';
 import { ExecutiveRoiDashboard } from './components/analytics/ExecutiveRoiDashboard';
 import { generarCampanaAutomaticaParaOportunidad } from './services/servicioMarketing';
+import { clienteSupabase, verificarConexionSupabase } from './services/clienteSupabase';
+import {
+  obtenerUniversidadesDesdeBD,
+  verificarConexionBaseDatos,
+  poblarDatosSemillaEnSupabase,
+  limpiarBaseDatosSupabase,
+  obtenerOportunidades,
+  mapearOportunidadADeal
+} from './services/servicioCrm';
 import { 
   LayoutDashboard, 
   Building2, 
@@ -24,7 +33,13 @@ import {
   Menu,
   X,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  Database,
+  Trash2,
+  RefreshCw,
+  CheckCircle2,
+  AlertTriangle,
+  HelpCircle
 } from 'lucide-react';
 
 type MainView = 'crm-pipeline' | 'crm-schools' | 'routes' | 'events-kit' | 'marketing' | 'analitica-roi' | 'registro-alumno-qr';
@@ -34,26 +49,62 @@ export function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
+  // Estado de conexión a base de datos Supabase
+  const [estadoBd, setEstadoBd] = useState<{
+    conectada: boolean;
+    totalUniversidades: number;
+    cargando: boolean;
+  }>({
+    conectada: false,
+    totalUniversidades: 0,
+    cargando: true
+  });
+
+  // Estados de control administrativo
+  const [modalVaciarAbierto, setModalVaciarAbierto] = useState(false);
+  const [cargandoAccionBd, setCargandoAccionBd] = useState(false);
+  const [notificacionToast, setNotificacionToast] = useState<{
+    tipo: 'exito' | 'error' | 'info';
+    titulo: string;
+    mensaje: string;
+  } | null>(null);
+
   // Estados de datos en memoria reactivos con persistencia resiliente
   const [companies, setCompanies] = useState<Company[]>(() => {
     try {
       const guardadas = localStorage.getItem('pap_crm_universidades_local');
-      if (guardadas) {
+      if (guardadas !== null) {
         const parsed = JSON.parse(guardadas);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const idsExistentes = new Set(parsed.map((p: any) => p.id));
-          const faltantes = SEED_COMPANIES.filter((s) => !idsExistentes.has(s.id));
-          return [...parsed, ...faltantes];
+        if (Array.isArray(parsed)) {
+          return parsed;
         }
       }
     } catch (e) {
       console.warn('Error cargando universidades locales:', e);
     }
-    return SEED_COMPANIES;
+    return [];
   });
 
-  const [contacts, setContacts] = useState<Contact[]>(SEED_CONTACTS);
-  const [deals, setDeals] = useState<Deal[]>(SEED_DEALS);
+  const [contacts, setContacts] = useState<Contact[]>(() => {
+    try {
+      const guardadas = localStorage.getItem('pap_crm_universidades_local');
+      if (guardadas !== null && JSON.parse(guardadas).length === 0) {
+        return [];
+      }
+    } catch {}
+    return SEED_CONTACTS;
+  });
+
+  const [deals, setDeals] = useState<Deal[]>(() => {
+    try {
+      const guardadas = localStorage.getItem('pap_crm_universidades_local');
+      if (guardadas !== null && JSON.parse(guardadas).length === 0) {
+        return [];
+      }
+    } catch {}
+    return SEED_DEALS;
+  });
+
   const [activities, setActivities] = useState<Activity[]>(SEED_ACTIVITIES);
   const [campaigns, setCampaigns] = useState<Campaign[]>(SEED_CAMPAIGNS);
 
@@ -82,6 +133,96 @@ export function App() {
       // Entorno sin window
     }
   }, []);
+
+  // Sincronización reactiva con Supabase al iniciar la aplicación
+  const sincronizarDatosDesdeBd = async () => {
+    try {
+      setEstadoBd((prev) => ({ ...prev, cargando: true }));
+      const estadoConexion = await verificarConexionBaseDatos();
+      const univsBd = await obtenerUniversidadesDesdeBD();
+      const oporBd = await obtenerOportunidades();
+      
+      setCompanies(univsBd);
+      if (oporBd && oporBd.length > 0) {
+        setDeals(oporBd.map(mapearOportunidadADeal));
+      } else if (univsBd.length === 0) {
+        setDeals([]);
+      }
+
+      setEstadoBd({
+        conectada: estadoConexion.conectada,
+        totalUniversidades: univsBd.length,
+        cargando: false
+      });
+    } catch (error) {
+      console.warn('Error sincronizando con base de datos:', error);
+      setEstadoBd((prev) => ({ ...prev, cargando: false }));
+    }
+  };
+
+  React.useEffect(() => {
+    sincronizarDatosDesdeBd();
+  }, []);
+
+  // Cargar lote inicial de datos semilla en PostgreSQL Supabase
+  const manejarCargarSemilla = async () => {
+    setCargandoAccionBd(true);
+    try {
+      const res = await poblarDatosSemillaEnSupabase();
+      if (res.exito) {
+        await sincronizarDatosDesdeBd();
+        setNotificacionToast({
+          tipo: 'exito',
+          titulo: 'Semilla Cargada en PostgreSQL',
+          mensaje: `Se cargaron ${res.totalUniversidades} instituciones, ${res.totalContactos} contactos y ${res.totalOportunidades} oportunidades en la base de datos oficial.`
+        });
+      } else {
+        setNotificacionToast({
+          tipo: 'error',
+          titulo: 'Aviso de Carga',
+          mensaje: `No se pudieron cargar los datos semilla: ${res.error || 'Verifica la conexión'}`
+        });
+      }
+    } catch (e: any) {
+      setNotificacionToast({
+        tipo: 'error',
+        titulo: 'Error',
+        mensaje: `Fallo durante la carga semilla: ${e?.message || 'Error desconocido'}`
+      });
+    } finally {
+      setCargandoAccionBd(false);
+      setTimeout(() => setNotificacionToast(null), 6000);
+    }
+  };
+
+  // Vaciar cartera de instituciones en base de datos y memoria local
+  const manejarVaciarCartera = async () => {
+    setCargandoAccionBd(true);
+    try {
+      await limpiarBaseDatosSupabase();
+      setCompanies([]);
+      setDeals([]);
+      setContacts([]);
+      setActivities([]);
+      setCampaigns([]);
+      setEstadoBd((prev) => ({ ...prev, totalUniversidades: 0 }));
+      setModalVaciarAbierto(false);
+      setNotificacionToast({
+        tipo: 'info',
+        titulo: 'Cartera Limpia',
+        mensaje: 'La base de datos y los respaldos locales se encuentran limpios en 0 para nuevas ingestas.'
+      });
+    } catch (e: any) {
+      setNotificacionToast({
+        tipo: 'error',
+        titulo: 'Error al Vaciar',
+        mensaje: `No fue posible vaciar la cartera: ${e?.message || 'Error desconocido'}`
+      });
+    } finally {
+      setCargandoAccionBd(false);
+      setTimeout(() => setNotificacionToast(null), 6000);
+    }
+  };
 
   // Actualizar etapa de un trato
   const handleUpdateDealStage = (dealId: string, newStage: PipelineStage) => {
@@ -164,7 +305,7 @@ export function App() {
   };
 
   // Importar instituciones educativas desde Excel o CSV a la cartera activa
-  const handleImportCompanies = (newCompanies: Company[]) => {
+  const handleImportCompanies = async (newCompanies: Company[]) => {
     setCompanies((prev) => {
       const actualizadas = [...newCompanies, ...prev];
       try {
@@ -174,6 +315,45 @@ export function App() {
       }
       return actualizadas;
     });
+
+    // Persistir de forma transparente en Supabase PostgreSQL si hay conexión
+    try {
+      const conexionOk = await verificarConexionSupabase();
+      if (conexionOk) {
+        const filas = newCompanies.map((c) => ({
+          id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : undefined,
+          nombre: c.name,
+          tipo: c.type,
+          estado: c.state,
+          municipio: c.municipality,
+          direccion: c.address,
+          latitud: c.lat,
+          longitud: c.lng,
+          telefono: c.phone,
+          correo_electronico: c.email,
+          director_nombre: c.directorName,
+          matricula_estudiantes: c.studentCount,
+          colegiatura_mensual: c.monthlyTuition,
+          puntuacion_prioridad: c.leadScore,
+          estatus: c.status,
+          etiquetas: c.tags,
+          modalidad_preferida: c.preferredModality || 'modalidad_a_programa',
+          marcas_aliadas: c.alliedBrands || []
+        }));
+
+        await clienteSupabase.from('universidades').upsert(filas as any);
+        const { count } = await clienteSupabase
+          .from('universidades')
+          .select('*', { count: 'exact', head: true });
+        
+        setEstadoBd((prev) => ({
+          ...prev,
+          totalUniversidades: count ?? (prev.totalUniversidades + newCompanies.length)
+        }));
+      }
+    } catch (e) {
+      console.warn('Error sincronizando importación con Supabase:', e);
+    }
   };
 
   // Registrar itinerario de ruta y viáticos en la agenda del CRM
@@ -500,11 +680,49 @@ export function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Estado del Sistema */}
-            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/60">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              Sistema En Línea
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Indicador de Estado de Base de Datos Supabase PostgreSQL */}
+            {estadoBd.conectada ? (
+              <div
+                title="Conexión en tiempo real activa con Supabase PostgreSQL local"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/80 shadow-xs"
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span className="hidden sm:inline">PostgreSQL Local Conectado ({estadoBd.totalUniversidades} escuelas)</span>
+                <span className="sm:hidden">PG Conectado ({estadoBd.totalUniversidades})</span>
+              </div>
+            ) : (
+              <div
+                title="Operando en memoria local (localStorage) de contingencia"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200/80 shadow-xs"
+              >
+                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                <span className="hidden sm:inline">Modo Respaldo Local (Sin conexión a BD)</span>
+                <span className="sm:hidden">Respaldo Local</span>
+              </div>
+            )}
+
+            {/* Botones Administrativos Discretos */}
+            <div className="flex items-center gap-1.5 pl-1 sm:pl-2 border-l border-black/5">
+              <button
+                onClick={manejarCargarSemilla}
+                disabled={cargandoAccionBd}
+                title="Poblar catálogo de prueba oficial en PostgreSQL (SEED_COMPANIES, contactos y tratos)"
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-[#0f094f]/5 text-[#0f094f] hover:bg-[#0f094f]/10 border border-[#0f094f]/15 transition-all disabled:opacity-50"
+              >
+                <Database className={`w-3.5 h-3.5 text-[#29008e] ${cargandoAccionBd ? 'animate-spin' : ''}`} />
+                <span className="hidden md:inline">Cargar Semilla en BD</span>
+              </button>
+
+              <button
+                onClick={() => setModalVaciarAbierto(true)}
+                disabled={cargandoAccionBd}
+                title="Limpiar base de datos y reiniciar en modo cartera vacía para pruebas limpias de Excel"
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-red-50 text-red-700 hover:bg-red-100/80 border border-red-200/60 transition-all disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                <span className="hidden md:inline">Vaciar Cartera (Modo Limpio)</span>
+              </button>
             </div>
 
             {/* Ficha de Usuario en Topbar */}
@@ -538,6 +756,8 @@ export function App() {
                   setActiveQrDealId(dealId);
                   setModalQrAbierto(true);
                 }}
+                onCargarSemilla={manejarCargarSemilla}
+                onIrAImportar={() => setCurrentView('crm-schools')}
               />
             )}
 
@@ -553,6 +773,7 @@ export function App() {
                 onCloseCompanyDetail={() => setSelectedSchoolDetailId(null)}
                 onOpenCompanyDetail={(id) => setSelectedSchoolDetailId(id)}
                 onImportCompanies={handleImportCompanies}
+                onCargarSemilla={manejarCargarSemilla}
               />
             )}
 
@@ -724,6 +945,102 @@ export function App() {
           </div>
         );
       })()}
+
+      {/* ============================================================== */}
+      {/* MODAL DE CONFIRMACIÓN: VACIAR CARTERA (MODO LIMPIO)           */}
+      {/* ============================================================== */}
+      {modalVaciarAbierto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#07052e]/70 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-develop-modal border border-black/10 animate-scaleUp">
+            <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mb-4 border border-red-200">
+              <Trash2 className="w-6 h-6" />
+            </div>
+
+            <h3 className="text-lg font-bold text-[#111111] tracking-tight">
+              ¿Vaciar Cartera y Reiniciar en Modo Limpio?
+            </h3>
+            
+            <p className="text-xs text-[#555555] mt-2 leading-relaxed">
+              Esta acción ejecutará un borrado masivo controlado en las tablas de <strong>PostgreSQL</strong> (actividades, prospectos, rutas, oportunidades y universidades) y restablecerá los respaldos locales a 0 registros.
+            </p>
+
+            <div className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <span>
+                Ideal para validar la ingesta limpia de archivos <strong>Excel (.xlsx) y CSV</strong> desde cero o para restaurar semillas cuando lo requieras.
+              </span>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setModalVaciarAbierto(false)}
+                disabled={cargandoAccionBd}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-[#555555] hover:bg-black/5 transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={manejarVaciarCartera}
+                disabled={cargandoAccionBd}
+                className="btn-danger-develop px-4 py-2 text-xs font-bold inline-flex items-center gap-2 disabled:opacity-50"
+              >
+                {cargandoAccionBd ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Vaciando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>Sí, Vaciar Cartera</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* TOAST DE NOTIFICACIÓN FLOTANTE (ESTADOS DE BD / ACCIONES)      */}
+      {/* ============================================================== */}
+      {notificacionToast && (
+        <div className="fixed bottom-5 right-5 z-50 max-w-sm w-full p-4 rounded-2xl shadow-develop-modal border flex items-start gap-3 animate-slideUp bg-white text-[#111111] border-black/10">
+          {notificacionToast.tipo === 'exito' && (
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-200">
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
+          )}
+          {notificacionToast.tipo === 'info' && (
+            <div className="w-8 h-8 rounded-xl bg-[#0f094f]/5 text-[#29008e] flex items-center justify-center shrink-0 border border-[#29008e]/20">
+              <Database className="w-4 h-4" />
+            </div>
+          )}
+          {notificacionToast.tipo === 'error' && (
+            <div className="w-8 h-8 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0 border border-red-200">
+              <AlertTriangle className="w-4 h-4" />
+            </div>
+          )}
+
+          <div className="flex-1 min-w-0">
+            <h4 className="text-xs font-bold text-[#111111] leading-tight">
+              {notificacionToast.titulo}
+            </h4>
+            <p className="text-[11px] text-[#555555] mt-0.5 leading-snug">
+              {notificacionToast.mensaje}
+            </p>
+          </div>
+
+          <button
+            onClick={() => setNotificacionToast(null)}
+            className="text-[#888888] hover:text-[#111111] p-1 -mr-1 -mt-1 rounded-lg"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

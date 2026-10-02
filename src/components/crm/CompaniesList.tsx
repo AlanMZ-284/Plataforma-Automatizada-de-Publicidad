@@ -15,7 +15,10 @@ import {
   FileText,
   Navigation,
   X,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Database,
+  Sparkles,
+  UploadCloud
 } from 'lucide-react';
 import { ModalImportarExcel } from './ModalImportarExcel';
 import { transformarUniversidadACompania } from '../../utils/lectorExcelUniversidades';
@@ -32,6 +35,7 @@ interface CompaniesListProps {
   onCloseCompanyDetail?: () => void;
   onOpenCompanyDetail?: (id: string) => void;
   onImportCompanies?: (newCompanies: Company[]) => void;
+  onCargarSemilla?: () => void;
 }
 
 export const CompaniesList: React.FC<CompaniesListProps> = ({
@@ -44,7 +48,8 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
   selectedCompanyId,
   onCloseCompanyDetail,
   onOpenCompanyDetail,
-  onImportCompanies
+  onImportCompanies,
+  onCargarSemilla
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedState, setSelectedState] = useState<string>('todos');
@@ -194,122 +199,180 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
         </div>
       </div>
 
-      {/* GRID DE ESCUELAS CON CARDS CLARAS DEVELOP */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {filteredCompanies.map((school) => {
-          const schoolDeals = deals.filter((d) => d.companyId === school.id);
+      {/* VISTA VACÍA O GRID DE ESCUELAS CON CARDS CLARAS DEVELOP */}
+      {companies.length === 0 ? (
+        <div className="card-light p-8 sm:p-12 text-center rounded-[32px] border border-black/10 bg-white shadow-xs max-w-3xl mx-auto my-6 animate-fadeIn">
+          <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#0f094f]/10 via-[#29008e]/10 to-[#640354]/10 text-[#0f094f] flex items-center justify-center mx-auto mb-6 border border-[#29008e]/20 shadow-develop-glow/20">
+            <Building2 className="w-10 h-10 text-[#29008e]" />
+          </div>
 
-          return (
-            <div
-              key={school.id}
-              className="card-light card-light-hover p-4 sm:p-6 flex flex-col justify-between text-left group rounded-[24px]"
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-[#0f094f]/5 text-[#0f094f] border border-[#0f094f]/10 mb-3">
+            <span className="w-2 h-2 rounded-full bg-[#a78bfa] animate-ping"></span>
+            Modo Base de Datos Limpia
+          </span>
+
+          <h3 className="text-xl sm:text-2xl font-bold text-[#111111] tracking-tight mt-1">
+            Cartera de Universidades Vacía: No hay instituciones registradas en la base de datos
+          </h3>
+
+          <p className="text-sm text-[#555555] max-w-xl mx-auto mt-2 leading-relaxed">
+            La base de datos oficial se encuentra en un estado limpio. Puedes comenzar la ingesta masiva de planteles mediante archivos <strong>Excel (.xlsx, .xls)</strong> o <strong>CSV</strong>, o restaurar el catálogo representativo de 12 instituciones de prueba.
+          </p>
+
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3.5">
+            <button
+              onClick={() => setModalImportarAbierto(true)}
+              className="btn-primary-develop inline-flex items-center gap-2.5 px-6 py-3 text-xs font-bold w-full sm:w-auto justify-center shadow-develop-box"
             >
-              <div>
-                {/* Header de Tarjeta */}
-                <div className="flex items-start justify-between gap-2 mb-3">
-                  <span className={`text-[10px] uppercase font-bold px-2.5 py-0.5 rounded-full ${
-                    school.state === 'CDMX' 
-                      ? 'bg-[#0f094f]/10 text-[#0f094f] border border-[#0f094f]/15' 
-                      : 'bg-[#29008e]/10 text-[#29008e] border border-[#29008e]/15'
-                  }`}>
-                    {school.state}
-                  </span>
+              <FileSpreadsheet className="w-4 h-4 text-[#a78bfa]" />
+              <span>Importar Excel / CSV</span>
+            </button>
 
-                  <div className="flex items-center gap-1 bg-[#640354]/10 text-[#640354] px-2.5 py-0.5 rounded-full text-xs font-bold border border-[#640354]/20">
-                    <Award className="w-3.5 h-3.5 text-[#640354]" />
-                    Score {school.leadScore}
+            {onCargarSemilla && (
+              <button
+                onClick={onCargarSemilla}
+                className="btn-secondary-light inline-flex items-center gap-2.5 px-6 py-3 text-xs font-bold w-full sm:w-auto justify-center border border-black/10 hover:border-[#29008e]/30"
+              >
+                <Database className="w-4 h-4 text-[#29008e]" />
+                <span>Cargar Escuelas de Prueba</span>
+              </button>
+            )}
+          </div>
+        </div>
+      ) : filteredCompanies.length === 0 ? (
+        <div className="card-light p-10 text-center rounded-[28px] border border-black/10 bg-white max-w-xl mx-auto my-8">
+          <Search className="w-10 h-10 text-[#888888] mx-auto mb-3 opacity-60" />
+          <h4 className="text-base font-bold text-[#111111]">Sin coincidencias de búsqueda</h4>
+          <p className="text-xs text-[#555555] mt-1">
+            No se encontraron instituciones que coincidan con &quot;{searchTerm}&quot; o la región seleccionada.
+          </p>
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setSelectedState('todos');
+            }}
+            className="mt-4 px-4 py-2 rounded-xl text-xs font-semibold btn-secondary-light"
+          >
+            Restablecer filtros
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {filteredCompanies.map((school) => {
+            const schoolDeals = deals.filter((d) => d.companyId === school.id);
+
+            return (
+              <div
+                key={school.id}
+                className="card-light card-light-hover p-4 sm:p-6 flex flex-col justify-between text-left group rounded-[24px]"
+              >
+                <div>
+                  {/* Header de Tarjeta */}
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <span className={`text-[10px] uppercase font-bold px-2.5 py-0.5 rounded-full ${
+                      school.state === 'CDMX' 
+                        ? 'bg-[#0f094f]/10 text-[#0f094f] border border-[#0f094f]/15' 
+                        : 'bg-[#29008e]/10 text-[#29008e] border border-[#29008e]/15'
+                    }`}>
+                      {school.state}
+                    </span>
+
+                    <div className="flex items-center gap-1 bg-[#640354]/10 text-[#640354] px-2.5 py-0.5 rounded-full text-xs font-bold border border-[#640354]/20">
+                      <Award className="w-3.5 h-3.5 text-[#640354]" />
+                      Score {school.leadScore}
+                    </div>
+                  </div>
+
+                  <h3 className="font-bold text-[#111111] text-base group-hover:text-[#0f094f] transition-colors leading-snug">
+                    {school.name}
+                  </h3>
+
+                  <div className="flex items-center gap-1.5 text-xs text-[#555555] mt-1.5">
+                    <MapPin className="w-3.5 h-3.5 shrink-0 text-[#29008e]" />
+                    <span className="truncate">{school.municipality}, {school.state}</span>
+                  </div>
+
+                  {/* Métricas de la Universidad */}
+                  <div className="grid grid-cols-2 gap-2 mt-4 p-3 bg-[#F8F8FC] rounded-xl text-[11px] text-[#555555] border border-black/5">
+                    <div>
+                      <span className="text-[#888888] block text-[10px] font-semibold uppercase tracking-wider">Matrícula</span>
+                      <span className="font-extrabold text-[#111111] flex items-center gap-1 mt-0.5">
+                        <Users className="w-3 h-3 text-[#29008e]" />
+                        {school.studentCount.toLocaleString('es-MX')} alumnos
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[#888888] block text-[10px] font-semibold uppercase tracking-wider">Colegiatura</span>
+                      <span className="font-extrabold text-[#111111] block mt-0.5">
+                        ${school.monthlyTuition.toLocaleString('es-MX')}/mes
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 text-xs space-y-1.5 text-[#555555]">
+                    <div className="flex items-center gap-2">
+                      <GraduationCap className="w-4 h-4 text-[#0f094f]" />
+                      <span className="font-semibold text-[#111111]">{school.directorName}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[#555555]">
+                      <Phone className="w-4 h-4 text-[#888888]" />
+                      <span>{school.phone}</span>
+                    </div>
+                  </div>
+
+                  {/* Chips de Modalidad y Marcas */}
+                  <div className="flex flex-wrap gap-1.5 mt-4">
+                    {school.preferredModality && (
+                      <span className="chip-skill text-[10px] px-2 py-0.5">
+                        {school.preferredModality === 'modalidad_a_programa' ? 'Mod. A: Programa' : 'Mod. B: Alojado'}
+                      </span>
+                    )}
+                    {school.alliedBrands && school.alliedBrands.map((brand) => (
+                      <span
+                        key={brand}
+                        className="text-[10px] px-2 py-0.5 bg-[#29008e]/5 text-[#29008e] rounded-md font-semibold border border-[#29008e]/15"
+                      >
+                        {brand}
+                      </span>
+                    ))}
+                    {school.tags.slice(0, 2).map((tag) => (
+                      <span
+                        key={tag}
+                        className="text-[10px] px-2 py-0.5 bg-black/5 text-[#555555] rounded-md font-medium"
+                      >
+                        {tag}
+                      </span>
+                    ))}
                   </div>
                 </div>
 
-                <h3 className="font-bold text-[#111111] text-base group-hover:text-[#0f094f] transition-colors leading-snug">
-                  {school.name}
-                </h3>
-
-                <div className="flex items-center gap-1.5 text-xs text-[#555555] mt-1.5">
-                  <MapPin className="w-3.5 h-3.5 shrink-0 text-[#29008e]" />
-                  <span className="truncate">{school.municipality}, {school.state}</span>
-                </div>
-
-                {/* Métricas de la Universidad */}
-                <div className="grid grid-cols-2 gap-2 mt-4 p-3 bg-[#F8F8FC] rounded-xl text-[11px] text-[#555555] border border-black/5">
-                  <div>
-                    <span className="text-[#888888] block text-[10px] font-semibold uppercase tracking-wider">Matrícula</span>
-                    <span className="font-extrabold text-[#111111] flex items-center gap-1 mt-0.5">
-                      <Users className="w-3 h-3 text-[#29008e]" />
-                      {school.studentCount.toLocaleString('es-MX')} alumnos
-                    </span>
+                {/* Footer con Botón Ver Ficha 360 */}
+                <div className="mt-5 pt-3 border-t border-black/5 flex items-center justify-between">
+                  <div className="text-[11px] text-[#888888]">
+                    {schoolDeals.length > 0 ? (
+                      <span className="font-semibold text-[#0f094f]">
+                        {schoolDeals.length} convenio(s) activo(s)
+                      </span>
+                    ) : (
+                      <span>Sin convenios activos</span>
+                    )}
                   </div>
-                  <div>
-                    <span className="text-[#888888] block text-[10px] font-semibold uppercase tracking-wider">Colegiatura</span>
-                    <span className="font-extrabold text-[#111111] block mt-0.5">
-                      ${school.monthlyTuition.toLocaleString('es-MX')}/mes
-                    </span>
-                  </div>
-                </div>
 
-                <div className="mt-4 text-xs space-y-1.5 text-[#555555]">
-                  <div className="flex items-center gap-2">
-                    <GraduationCap className="w-4 h-4 text-[#0f094f]" />
-                    <span className="font-semibold text-[#111111]">{school.directorName}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-[#555555]">
-                    <Phone className="w-4 h-4 text-[#888888]" />
-                    <span>{school.phone}</span>
-                  </div>
-                </div>
-
-                {/* Chips de Modalidad y Marcas */}
-                <div className="flex flex-wrap gap-1.5 mt-4">
-                  {school.preferredModality && (
-                    <span className="chip-skill text-[10px] px-2 py-0.5">
-                      {school.preferredModality === 'modalidad_a_programa' ? 'Mod. A: Programa' : 'Mod. B: Alojado'}
-                    </span>
-                  )}
-                  {school.alliedBrands && school.alliedBrands.map((brand) => (
-                    <span
-                      key={brand}
-                      className="text-[10px] px-2 py-0.5 bg-[#29008e]/5 text-[#29008e] rounded-md font-semibold border border-[#29008e]/15"
-                    >
-                      {brand}
-                    </span>
-                  ))}
-                  {school.tags.slice(0, 2).map((tag) => (
-                    <span
-                      key={tag}
-                      className="text-[10px] px-2 py-0.5 bg-black/5 text-[#555555] rounded-md font-medium"
-                    >
-                      {tag}
-                    </span>
-                  ))}
+                  <button
+                    onClick={() => {
+                      setActiveModalCompanyId(school.id);
+                      if (onOpenCompanyDetail) onOpenCompanyDetail(school.id);
+                    }}
+                    className="btn-primary-develop text-xs px-3.5 py-1.5 font-bold"
+                  >
+                    Ver Ficha 360°
+                  </button>
                 </div>
               </div>
-
-              {/* Footer con Botón Ver Ficha 360 */}
-              <div className="mt-5 pt-3 border-t border-black/5 flex items-center justify-between">
-                <div className="text-[11px] text-[#888888]">
-                  {schoolDeals.length > 0 ? (
-                    <span className="font-semibold text-[#0f094f]">
-                      {schoolDeals.length} convenio(s) activo(s)
-                    </span>
-                  ) : (
-                    <span>Sin convenios activos</span>
-                  )}
-                </div>
-
-                <button
-                  onClick={() => {
-                    setActiveModalCompanyId(school.id);
-                    if (onOpenCompanyDetail) onOpenCompanyDetail(school.id);
-                  }}
-                  className="btn-primary-develop text-xs px-3.5 py-1.5 font-bold"
-                >
-                  Ver Ficha 360°
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* MODAL 360° EXPEDIENTE DE CLIENTE CON IDENTIDAD DEVELOP */}
       {activeCompany && (

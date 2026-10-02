@@ -18,7 +18,10 @@ import {
   Users,
   X,
   QrCode,
-  AlertTriangle
+  AlertTriangle,
+  Building2,
+  Database,
+  FileSpreadsheet
 } from 'lucide-react';
 import { actualizarEtapaOportunidad } from '../../services/servicioCrm';
 
@@ -31,6 +34,8 @@ interface DealsPipelineProps {
   onOpenEventKit?: (dealId: string) => void;
   onAddActivity?: (activity: Omit<Activity, 'id'>) => void;
   onAbrirRegistroQr?: (dealId: string) => void;
+  onCargarSemilla?: () => void;
+  onIrAImportar?: () => void;
 }
 
 // 6 etapas con colores armónicos alineados a la identidad visual Develop
@@ -51,7 +56,9 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
   onSelectSchoolForCRM,
   onOpenEventKit,
   onAddActivity,
-  onAbrirRegistroQr
+  onAbrirRegistroQr,
+  onCargarSemilla,
+  onIrAImportar
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRep, setSelectedRep] = useState('todos');
@@ -233,7 +240,9 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
 
         <button
           onClick={() => setIsModalOpen(true)}
-          className="btn-primary-develop inline-flex items-center gap-2 px-5 py-2.5 text-xs font-bold shrink-0 self-start md:self-auto"
+          disabled={companies.length === 0}
+          title={companies.length === 0 ? "Requiere registrar al menos una institución en cartera" : "Crear nueva oportunidad"}
+          className="btn-primary-develop inline-flex items-center gap-2 px-5 py-2.5 text-xs font-bold shrink-0 self-start md:self-auto disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Plus className="w-4 h-4 text-[#a78bfa]" />
           <span>Nueva Oportunidad</span>
@@ -275,6 +284,51 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
           >
             <X className="w-4 h-4" />
           </button>
+        </div>
+      )}
+
+      {/* AVISO AMIGABLE CUANDO LA CARTERA DE INSTITUCIONES ESTÁ VACÍA */}
+      {companies.length === 0 && (
+        <div className="card-light p-6 sm:p-8 rounded-[28px] border-2 border-dashed border-[#29008e]/20 bg-gradient-to-br from-white via-[#F8F8FC] to-[#0f094f]/5 shadow-xs flex flex-col md:flex-row items-center justify-between gap-6 animate-fadeIn">
+          <div className="flex items-start gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#0f094f] via-[#29008e] to-[#640354] p-[1.5px] shrink-0 shadow-develop-box">
+              <div className="w-full h-full rounded-[14px] bg-[#07052e] flex items-center justify-center text-white">
+                <Building2 className="w-7 h-7 text-[#a78bfa]" />
+              </div>
+            </div>
+            <div>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#29008e]/10 text-[#29008e] mb-1.5">
+                Cartera Vacía
+              </span>
+              <h3 className="text-base sm:text-lg font-bold text-[#111111]">
+                Se requiere registrar instituciones en la cartera antes de abrir oportunidades comerciales
+              </h3>
+              <p className="text-xs text-[#555555] mt-1 max-w-xl leading-relaxed">
+                Cada oportunidad del pipeline se vincula a una institución educativa. Puedes importar planteles desde archivos Excel o CSV en el Directorio, o cargar la semilla de prueba con 12 instituciones representativas.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0 w-full md:w-auto">
+            {onIrAImportar && (
+              <button
+                onClick={onIrAImportar}
+                className="btn-primary-develop inline-flex items-center gap-2 px-4 py-2.5 text-xs font-bold w-full md:w-auto justify-center shadow-develop-box"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-[#a78bfa]" />
+                <span>Importar Excel / CSV</span>
+              </button>
+            )}
+            {onCargarSemilla && (
+              <button
+                onClick={onCargarSemilla}
+                className="btn-secondary-light inline-flex items-center gap-2 px-4 py-2.5 text-xs font-bold w-full md:w-auto justify-center border border-black/10 hover:border-[#29008e]/30"
+              >
+                <Database className="w-4 h-4 text-[#29008e]" />
+                <span>Cargar Semilla</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
 
