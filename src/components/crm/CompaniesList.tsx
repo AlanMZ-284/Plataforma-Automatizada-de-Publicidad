@@ -729,6 +729,45 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
                   </div>
                 </div>
 
+                {/* Metadatos Excel (JSONB) - Columnas Libres */}
+                {activeCompany.datos_adicionales && Object.keys(activeCompany.datos_adicionales).length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <FileSpreadsheet className="w-3.5 h-3.5 text-[#29008e]" />
+                        <h4 className="text-[10px] font-bold uppercase text-[#888888] tracking-widest">
+                          Metadatos Excel (JSONB)
+                        </h4>
+                      </div>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-[#29008e]/10 text-[#29008e]">
+                        {Object.keys(activeCompany.datos_adicionales).length} {Object.keys(activeCompany.datos_adicionales).length === 1 ? 'campo' : 'campos'}
+                      </span>
+                    </div>
+
+                    <div className="card-light p-4 space-y-2.5 text-xs rounded-2xl bg-white border border-black/5 divide-y divide-black/5">
+                      {Object.entries(activeCompany.datos_adicionales).map(([clave, valor], idx) => {
+                        const valorFormateado =
+                          valor === null || valor === undefined || valor === ''
+                            ? '—'
+                            : typeof valor === 'object'
+                            ? JSON.stringify(valor)
+                            : String(valor);
+
+                        return (
+                          <div key={clave} className={idx > 0 ? 'pt-2' : ''}>
+                            <span className="text-[#888888] block text-[10px] font-semibold uppercase tracking-wider">
+                              {clave.replace(/_/g, ' ')}
+                            </span>
+                            <span className="font-bold text-[#111111] block mt-0.5 break-words">
+                              {valorFormateado}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* Convenios / Oportunidades en Pipeline */}
                 <div>
                   <div className="flex items-center justify-between mb-2.5">

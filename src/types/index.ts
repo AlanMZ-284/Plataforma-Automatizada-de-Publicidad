@@ -39,6 +39,7 @@ export interface Company {
   tags: string[];
   preferredModality?: ProjectModality;
   alliedBrands?: string[];
+  datos_adicionales?: Record<string, any>;
 }
 
 export interface Contact {

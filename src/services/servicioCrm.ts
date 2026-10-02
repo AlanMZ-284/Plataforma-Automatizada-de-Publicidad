@@ -137,7 +137,8 @@ export function mapearUniversidadACompany(u: Universidad): Company {
     status: (u.estatus as any) || 'prospecto',
     tags: u.etiquetas && u.etiquetas.length > 0 ? u.etiquetas : ['Institución Educativa'],
     preferredModality: (u.modalidad_preferida as any) || 'modalidad_a_programa',
-    alliedBrands: u.marcas_aliadas && u.marcas_aliadas.length > 0 ? u.marcas_aliadas : ['Develop Academy']
+    alliedBrands: u.marcas_aliadas && u.marcas_aliadas.length > 0 ? u.marcas_aliadas : ['Develop Academy'],
+    datos_adicionales: (u.datos_adicionales as Record<string, any>) || undefined
   };
 }
 
