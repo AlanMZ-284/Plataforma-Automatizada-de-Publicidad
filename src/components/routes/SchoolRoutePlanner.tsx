@@ -28,7 +28,8 @@ import {
   CheckCircle2,
   Car,
   Search,
-  FileSpreadsheet
+  FileSpreadsheet,
+  FlagTriangleRight
 } from 'lucide-react';
 
 interface SchoolRoutePlannerProps {
@@ -613,7 +614,7 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
             {/* Punto de Inicio */}
             <div className="relative">
               <div className="absolute -left-[33px] top-1 w-6 h-6 rounded-full bg-[#0f094f] text-white flex items-center justify-center text-xs font-bold shadow-md">
-                🏁
+                <FlagTriangleRight className="w-3.5 h-3.5 text-emerald-600 inline mr-1" />
               </div>
               <div className="bg-[#F8F8FC] p-4 rounded-2xl border border-black/5 text-xs">
                 <div className="font-bold text-[#111111]">Salida: {recorridoActual.origen.nombre}</div>
@@ -697,7 +698,7 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
             {/* Punto de Retorno */}
             <div className="relative">
               <div className="absolute -left-[33px] top-1 w-6 h-6 rounded-full bg-[#0f094f] text-white flex items-center justify-center text-xs font-bold shadow-md">
-                🏁
+                <FlagTriangleRight className="w-3.5 h-3.5 text-emerald-600 inline mr-1" />
               </div>
               <div className="bg-[#0f094f]/5 p-4 rounded-2xl border border-[#0f094f]/15 text-xs">
                 <div className="font-bold text-[#0f094f]">Retorno a Sede Base: {recorridoActual.origen.nombre}</div>

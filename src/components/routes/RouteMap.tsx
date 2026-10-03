@@ -112,8 +112,8 @@ export const RouteMap: React.FC<PropiedadesMapaRutas> = ({
             <h4 style="margin: 6px 0 3px; font-weight: 700; font-size: 13px; color: #111;">${nombre}</h4>
             <p style="margin: 0; color: #666; font-size: 11px;">${municipio}, ${estado}</p>
             <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #eee;">
-              <p style="margin: 0 0 3px; color: #111; font-size: 11px;">🕒 <strong>Llegada est.:</strong> ${horaLlegada}</p>
-              <p style="margin: 0; color: #111; font-size: 11px;">👤 <strong>Contacto:</strong> ${director}</p>
+              <p style="margin: 0 0 3px; color: #111; font-size: 11px;"><strong>Llegada est.:</strong> ${horaLlegada}</p>
+              <p style="margin: 0; color: #111; font-size: 11px;"><strong>Contacto:</strong> ${director}</p>
             </div>
           </div>
         `);

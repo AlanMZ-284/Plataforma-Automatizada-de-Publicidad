@@ -21,7 +21,10 @@ import {
   AlertTriangle,
   Building2,
   Database,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Rocket,
+  Trophy,
+  Star
 } from 'lucide-react';
 import { actualizarEtapaOportunidad } from '../../services/servicioCrm';
 
@@ -39,13 +42,21 @@ interface DealsPipelineProps {
 }
 
 // 6 etapas con colores armónicos alineados a la identidad visual Develop
-const STAGES_CONFIG: { stage: PipelineStage; label: string; color: string; bg: string; border: string; badge: string }[] = [
+const STAGES_CONFIG: { 
+  stage: PipelineStage; 
+  label: string; 
+  color: string; 
+  bg: string; 
+  border: string; 
+  badge: string;
+  icono?: React.ComponentType<{ className?: string }>;
+}[] = [
   { stage: 'prospecto', label: '1. Prospecto', color: 'text-[#555555]', bg: 'bg-[#F8F8FC]', border: 'border-black/5', badge: 'bg-black/5 text-[#555555]' },
   { stage: 'contacto', label: '2. Contacto', color: 'text-[#0f094f]', bg: 'bg-[#0f094f]/[0.02]', border: 'border-[#0f094f]/10', badge: 'bg-[#0f094f]/10 text-[#0f094f]' },
   { stage: 'propuesta', label: '3. Propuesta', color: 'text-[#640354]', bg: 'bg-[#640354]/[0.02]', border: 'border-[#640354]/10', badge: 'bg-[#640354]/10 text-[#640354]' },
-  { stage: 'agendado', label: '4. Agendado 📅', color: 'text-[#29008e]', bg: 'bg-[#29008e]/[0.02]', border: 'border-[#29008e]/10', badge: 'bg-[#29008e]/10 text-[#29008e]' },
-  { stage: 'realizado', label: '5. Realizado 🚀', color: 'text-[#6d28d9]', bg: 'bg-[#a78bfa]/[0.05]', border: 'border-[#a78bfa]/20', badge: 'bg-[#a78bfa]/15 text-[#29008e]' },
-  { stage: 'resultado', label: '6. Resultado / Éxito 🏆', color: 'text-emerald-700', bg: 'bg-emerald-50/50', border: 'border-emerald-200/60', badge: 'bg-emerald-100 text-emerald-800' },
+  { stage: 'agendado', label: '4. Agendado', color: 'text-[#29008e]', bg: 'bg-[#29008e]/[0.02]', border: 'border-[#29008e]/10', badge: 'bg-[#29008e]/10 text-[#29008e]', icono: Calendar },
+  { stage: 'realizado', label: '5. Realizado', color: 'text-[#6d28d9]', bg: 'bg-[#a78bfa]/[0.05]', border: 'border-[#a78bfa]/20', badge: 'bg-[#a78bfa]/15 text-[#29008e]', icono: Rocket },
+  { stage: 'resultado', label: '6. Resultado / Éxito', color: 'text-emerald-700', bg: 'bg-emerald-50/50', border: 'border-emerald-200/60', badge: 'bg-emerald-100 text-emerald-800', icono: Trophy },
 ];
 
 export const DealsPipeline: React.FC<DealsPipelineProps> = ({
@@ -477,7 +488,7 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
       {/* TABLERO KANBAN DE VENTAS (6 COLUMNAS CON ESTILO ENTERPRISE DEVELOP) */}
       <div className="overflow-x-auto pb-3 -mx-3 px-3 sm:mx-0 sm:px-0">
         <div className="flex xl:grid xl:grid-cols-6 gap-4 items-start min-w-max xl:min-w-0">
-        {STAGES_CONFIG.map(({ stage, label, color, bg, border, badge }) => {
+        {STAGES_CONFIG.map(({ stage, label, color, bg, border, badge, icono: Icono }) => {
           const stageDeals = filteredDeals.filter((d) => d.stage === stage);
           const stageTotal = stageDeals.reduce((acc, d) => acc + d.amount, 0);
 
@@ -488,7 +499,10 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
             >
               {/* Encabezado de Columna */}
               <div className="pb-3 border-b border-black/5 mb-3">
-                <div className={`text-xs font-bold ${color} truncate tracking-tight`}>{label}</div>
+                <div className={`text-xs font-bold ${color} truncate tracking-tight flex items-center gap-1.5`}>
+                  {Icono && <Icono className="w-3.5 h-3.5 shrink-0" />}
+                  <span>{label}</span>
+                </div>
                 <div className="flex items-center justify-between text-[11px] text-[#555555] mt-1.5">
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${badge}`}>
                     {stageDeals.length}
@@ -508,148 +522,175 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                   return (
                     <div
                       key={deal.id}
-                      className="card-light card-light-hover p-4 space-y-2.5 text-left group rounded-[18px]"
+                      className="card-light card-light-hover p-4 text-left group rounded-[18px] flex flex-col justify-between h-[395px]"
                     >
-                      {/* Universidad y Lead Score */}
-                      <div className="flex items-start justify-between gap-1">
-                        <span
-                          onClick={() => onSelectSchoolForCRM && onSelectSchoolForCRM(deal.companyId)}
-                          className="text-[11px] font-bold text-[#0f094f] hover:text-[#29008e] hover:underline cursor-pointer line-clamp-1"
-                          title={company?.name}
-                        >
-                          {company?.name || 'Universidad'}
-                        </span>
-                        {company && (
-                          <span className="text-[10px] px-1.5 py-0.5 bg-[#640354]/10 text-[#640354] font-bold rounded-md shrink-0">
-                            ★ {company.leadScore}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Título de la Oportunidad */}
-                      <h4 className="font-bold text-xs text-[#111111] leading-snug">
-                        {deal.title}
-                      </h4>
-
-                      {/* Badges de Modalidad A/B y Tipo de Evento */}
-                      <div className="flex flex-wrap gap-1">
-                        <span className={`text-[9px] px-2 py-0.5 font-bold rounded-md flex items-center gap-1 ${
-                          deal.projectModality === 'modalidad_a_programa'
-                            ? 'bg-[#0f094f]/10 text-[#0f094f] border border-[#0f094f]/15'
-                            : 'bg-[#29008e]/10 text-[#29008e] border border-[#29008e]/15'
-                        }`}>
-                          <Layers className="w-2.5 h-2.5" />
-                          {deal.projectModality === 'modalidad_a_programa' ? 'Mod. A: Programa' : 'Mod. B: Alojado'}
-                        </span>
-
-                        <span className="text-[9px] px-2 py-0.5 bg-black/5 text-[#555555] font-semibold rounded-md">
-                          {deal.eventType.replace('_', ' ')}
-                        </span>
-                      </div>
-
-                      {/* Marcas Aliadas Patrocinadoras */}
-                      {deal.alliedBrands && deal.alliedBrands.length > 0 && (
-                        <div className="flex items-center gap-1.5 text-[10px] text-[#555555] pt-0.5">
-                          <Flag className="w-3 h-3 text-[#29008e] shrink-0" />
-                          <span className="font-medium truncate">
-                            Sponsors: {deal.alliedBrands.join(', ')}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Monto y Probabilidad */}
-                      <div className="flex items-center justify-between pt-1">
-                        <div className="text-sm font-extrabold text-[#111111]">
-                          ${deal.amount.toLocaleString('es-MX')}
-                        </div>
-                        <div className="text-[10px] font-bold text-[#555555] bg-black/5 px-2 py-0.5 rounded-full">
-                          {deal.probability}% prob.
-                        </div>
-                      </div>
-
-                      {/* Alumnos Captados si el evento ya se realizó */}
-                      {deal.registeredLeadsCount !== undefined && deal.registeredLeadsCount > 0 && (
-                        <div className="text-[10px] bg-emerald-50 text-emerald-800 p-1.5 rounded-lg font-bold flex items-center justify-between border border-emerald-200/50">
-                          <span>Talento Registrado:</span>
-                          <span className="font-black">{deal.registeredLeadsCount} alumnos</span>
-                        </div>
-                      )}
-
-                      {/* Asesor y Fecha */}
-                      <div className="flex items-center justify-between text-[10px] text-[#888888] pt-2 border-t border-black/5">
-                        <span className="flex items-center gap-1 text-[#555555]">
-                          <User className="w-3 h-3 text-[#888888]" />
-                          {deal.assignedRep.split(' ')[0]}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          {deal.expectedCloseDate}
-                        </span>
-                      </div>
-
-                      {/* Botones de Avance de Etapa */}
-                      <div className="pt-2 flex items-center justify-between gap-1 border-t border-black/5">
-                        {currentIdx > 0 ? (
-                          <button
-                            onClick={() =>
-                              handleStageChange(deal.id, deal.stage, STAGES_CONFIG[currentIdx - 1].stage)
-                            }
-                            title="Regresar etapa anterior"
-                            className="p-1.5 hover:bg-black/5 rounded-lg text-[#888888] hover:text-[#111111] transition-colors"
+                      {/* Contenido Superior de la Tarjeta */}
+                      <div className="space-y-2">
+                        {/* Encabezado institucional: Universidad con tooltip/truncate + Lead Score */}
+                        <div className="flex items-start justify-between gap-1">
+                          <span
+                            onClick={() => onSelectSchoolForCRM && onSelectSchoolForCRM(deal.companyId)}
+                            className="text-[11px] font-bold text-[#0f094f] hover:text-[#29008e] hover:underline cursor-pointer truncate"
+                            title={company?.name}
                           >
-                            <ArrowLeft className="w-3.5 h-3.5" />
-                          </button>
-                        ) : (
-                          <div />
-                        )}
-
-                        <div className="flex items-center gap-1">
-                          {deal.stage !== 'resultado' && (
-                            <button
-                              onClick={() => handleStageChange(deal.id, deal.stage, 'resultado')}
-                              title="Marcar como Éxito / Ganado"
-                              className="px-2 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors"
-                            >
-                              <CheckCircle2 className="w-3 h-3 text-emerald-700" /> Éxito
-                            </button>
+                            {company?.name || 'Universidad'}
+                          </span>
+                          {company && (
+                            <span className="text-[10px] px-1.5 py-0.5 bg-[#640354]/10 text-[#640354] font-bold rounded-md shrink-0 flex items-center gap-1">
+                              <Star className="w-2.5 h-2.5 fill-amber-500 text-amber-500" />
+                              <span>{company.leadScore}</span>
+                            </span>
                           )}
+                        </div>
 
-                          {currentIdx < STAGES_CONFIG.length - 1 && (
-                            <button
-                              onClick={() =>
-                                handleStageChange(deal.id, deal.stage, STAGES_CONFIG[currentIdx + 1].stage)
-                              }
-                              title="Avanzar siguiente etapa"
-                              className="p-1.5 bg-[#0f094f] hover:bg-[#29008e] text-white rounded-lg transition-all shadow-xs"
-                            >
-                              <ArrowRight className="w-3.5 h-3.5" />
-                            </button>
+                        {/* Título de la oportunidad: forzar reserva fija de 2 líneas */}
+                        <h4 
+                          className="font-bold text-xs text-[#111111] leading-snug line-clamp-2 h-8"
+                          title={deal.title}
+                        >
+                          {deal.title}
+                        </h4>
+
+                        {/* Fila de modalidad y tipo de evento: contenedor compacto de altura fija (h-5) */}
+                        <div className="flex items-center gap-1 h-5 overflow-hidden">
+                          <span className={`text-[9px] px-2 py-0.5 font-bold rounded-md flex items-center gap-1 shrink-0 ${
+                            deal.projectModality === 'modalidad_a_programa'
+                              ? 'bg-[#0f094f]/10 text-[#0f094f] border border-[#0f094f]/15'
+                              : 'bg-[#29008e]/10 text-[#29008e] border border-[#29008e]/15'
+                          }`}>
+                            <Layers className="w-2.5 h-2.5" />
+                            {deal.projectModality === 'modalidad_a_programa' ? 'Mod. A: Programa' : 'Mod. B: Alojado'}
+                          </span>
+
+                          <span className="text-[9px] px-2 py-0.5 bg-black/5 text-[#555555] font-semibold rounded-md truncate">
+                            {deal.eventType.replace('_', ' ')}
+                          </span>
+                        </div>
+
+                        {/* Fila de marcas aliadas / sponsors: espacio reservado h-4 */}
+                        <div className="h-4 flex items-center gap-1.5 text-[10px] text-[#555555]">
+                          {deal.alliedBrands && deal.alliedBrands.length > 0 ? (
+                            <>
+                              <Flag className="w-3 h-3 text-[#29008e] shrink-0" />
+                              <span className="font-medium truncate">
+                                Sponsors: {deal.alliedBrands.join(', ')}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-[10px] text-[#aaaaaa] italic truncate">
+                              Sin marcas asignadas
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Fila de monto y probabilidad: tipografía alineada y clara */}
+                        <div className="flex items-center justify-between pt-0.5">
+                          <div className="text-sm font-extrabold text-[#111111]">
+                            ${deal.amount.toLocaleString('es-MX')}
+                          </div>
+                          <div className="text-[10px] font-bold text-[#555555] bg-black/5 px-2 py-0.5 rounded-full">
+                            {deal.probability}% prob.
+                          </div>
+                        </div>
+
+                        {/* Bloque de Talento Registrado: contenedor con altura fija h-6 */}
+                        <div className="h-6 flex items-center">
+                          {deal.registeredLeadsCount !== undefined && deal.registeredLeadsCount > 0 ? (
+                            <div className="w-full text-[10px] bg-emerald-50 text-emerald-800 px-2 py-1 rounded-lg font-bold flex items-center justify-between border border-emerald-200/50">
+                              <span className="truncate">Talento Registrado:</span>
+                              <span className="font-black shrink-0">{deal.registeredLeadsCount} alumnos</span>
+                            </div>
+                          ) : (
+                            <div className="w-full text-[10px] bg-black/[0.02] text-[#888888] px-2 py-1 rounded-lg font-medium flex items-center justify-between border border-black/5">
+                              <span className="truncate">Talento Registrado:</span>
+                              <span className="text-[#aaaaaa] shrink-0">0 alumnos</span>
+                            </div>
                           )}
                         </div>
                       </div>
 
-                      {/* Enlace al Kit de Evento Develop */}
-                      {onOpenEventKit && (
-                        <button
-                          onClick={() => onOpenEventKit(deal.id)}
-                          className="w-full mt-1.5 py-1.5 px-2 bg-[#0f094f]/5 hover:bg-[#0f094f]/10 text-[#0f094f] rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all border border-[#0f094f]/10 group-hover:border-[#0f094f]/20"
-                        >
-                          <Sparkles className="w-3.5 h-3.5 text-[#29008e]" />
-                          <span className="truncate">Ver Kit & Materiales ({deal.eventType.replace('_', ' ')})</span>
-                        </button>
-                      )}
+                      {/* Pie de tarjeta fijo al fondo (mt-auto space-y-1.5) */}
+                      <div className="mt-auto space-y-1.5 pt-2 border-t border-black/5">
+                        {/* Fecha y asesor con borde superior tenue */}
+                        <div className="flex items-center justify-between text-[10px] text-[#888888]">
+                          <span className="flex items-center gap-1 text-[#555555] truncate max-w-[110px]" title={deal.assignedRep}>
+                            <User className="w-3 h-3 text-[#888888] shrink-0" />
+                            <span className="truncate">{deal.assignedRep.split(' ')[0]}</span>
+                          </span>
+                          <span className="flex items-center gap-1 shrink-0">
+                            <Calendar className="w-3 h-3 text-[#888888] shrink-0" />
+                            <span>{deal.expectedCloseDate}</span>
+                          </span>
+                        </div>
 
-                      {/* Botón directo de Captura QR en Stand */}
-                      {onAbrirRegistroQr && (
-                        <button
-                          type="button"
-                          onClick={() => onAbrirRegistroQr(deal.id)}
-                          className="w-full mt-1.5 py-1.5 px-2 bg-[#640354]/10 hover:bg-[#640354]/15 text-[#640354] rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all border border-[#640354]/20 group-hover:border-[#640354]/30"
-                        >
-                          <QrCode className="w-3.5 h-3.5 text-[#640354]" />
-                          <span>Captura QR Alumnos ({deal.registeredLeadsCount || 0})</span>
-                        </button>
-                      )}
+                        {/* Controles de avance */}
+                        <div className="flex items-center justify-between gap-1 pt-1 border-t border-black/5">
+                          {currentIdx > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleStageChange(deal.id, deal.stage, STAGES_CONFIG[currentIdx - 1].stage)
+                              }
+                              title="Regresar etapa anterior"
+                              className="p-1 hover:bg-black/5 rounded-lg text-[#888888] hover:text-[#111111] transition-colors"
+                            >
+                              <ArrowLeft className="w-3.5 h-3.5" />
+                            </button>
+                          ) : (
+                            <div />
+                          )}
+
+                          <div className="flex items-center gap-1">
+                            {deal.stage !== 'resultado' && (
+                              <button
+                                type="button"
+                                onClick={() => handleStageChange(deal.id, deal.stage, 'resultado')}
+                                title="Marcar como Éxito / Ganado"
+                                className="px-2 py-0.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors"
+                              >
+                                <CheckCircle2 className="w-3 h-3 text-emerald-700" /> Éxito
+                              </button>
+                            )}
+
+                            {currentIdx < STAGES_CONFIG.length - 1 && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleStageChange(deal.id, deal.stage, STAGES_CONFIG[currentIdx + 1].stage)
+                                }
+                                title="Avanzar siguiente etapa"
+                                className="p-1 bg-[#0f094f] hover:bg-[#29008e] text-white rounded-lg transition-all shadow-xs"
+                              >
+                                <ArrowRight className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Botón Ver Kit & Materiales */}
+                        {onOpenEventKit && (
+                          <button
+                            type="button"
+                            onClick={() => onOpenEventKit(deal.id)}
+                            className="w-full py-1 px-2 bg-[#0f094f]/5 hover:bg-[#0f094f]/10 text-[#0f094f] rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all border border-[#0f094f]/10 group-hover:border-[#0f094f]/20"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-[#29008e]" />
+                            <span className="truncate">Ver Kit & Materiales ({deal.eventType.replace('_', ' ')})</span>
+                          </button>
+                        )}
+
+                        {/* Botón directo de Captura QR en Stand */}
+                        {onAbrirRegistroQr && (
+                          <button
+                            type="button"
+                            onClick={() => onAbrirRegistroQr(deal.id)}
+                            className="w-full py-1 px-2 bg-[#640354]/10 hover:bg-[#640354]/15 text-[#640354] rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all border border-[#640354]/20 group-hover:border-[#640354]/30"
+                          >
+                            <QrCode className="w-3.5 h-3.5 text-[#640354]" />
+                            <span>Captura QR Alumnos ({deal.registeredLeadsCount || 0})</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}

@@ -62,8 +62,8 @@ const OPCIONES_CAMPOS_CANONICOS: { clave: CampoCanonico | 'datos_adicionales' | 
   { clave: 'modalidad_preferida', etiqueta: 'Modalidad Preferida (A o B)' },
   { clave: 'etiquetas', etiqueta: 'Etiquetas / Especialidades' },
   { clave: 'marcas_aliadas', etiqueta: 'Marcas Aliadas' },
-  { clave: 'datos_adicionales', etiqueta: '📦 Datos Adicionales (JSONB)' },
-  { clave: 'ignorar', etiqueta: '⛔ Ignorar esta columna' }
+  { clave: 'datos_adicionales', etiqueta: 'Datos Adicionales (JSONB)' },
+  { clave: 'ignorar', etiqueta: 'Ignorar esta columna' }
 ];
 
 export const ModalImportarExcel: React.FC<PropiedadesModalImportarExcel> = ({

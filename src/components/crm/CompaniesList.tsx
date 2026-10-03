@@ -22,7 +22,8 @@ import {
   UserPlus,
   RefreshCw,
   Loader2,
-  Edit3
+  Edit3,
+  Star
 } from 'lucide-react';
 import { ModalImportarExcel } from './ModalImportarExcel';
 import { transformarUniversidadACompania } from '../../utils/lectorExcelUniversidades';
@@ -640,9 +641,7 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
                     <span className="text-[10px] px-2.5 py-0.5 pill-dark font-bold uppercase tracking-wider">
                       Expediente 360°
                     </span>
-                    <span className="text-xs text-[#f472b6] font-bold">
-                      ★ Score: {activeCompany.leadScore}/100
-                    </span>
+                    <span className="text-xs text-[#f472b6] font-bold flex items-center gap-1"><Star className="w-3 h-3 fill-amber-400 text-amber-400" /><span>Score: {activeCompany.leadScore}/100</span></span>
                   </div>
                   <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-white mt-0.5">{activeCompany.name}</h2>
                   <p className="text-xs text-white/70 flex items-center gap-1.5 mt-0.5">
