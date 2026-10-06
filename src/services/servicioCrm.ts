@@ -17,6 +17,7 @@ import {
   Oportunidad,
   OportunidadInsercion,
   EtapaOportunidad,
+  ProspectoAlumno,
   ProspectoAlumnoInsercion,
   ActividadCrmInsercion,
   RecorridoRuta,
@@ -1021,6 +1022,161 @@ export async function registrarAlumnoQr(lead: ParametrosRegistroAlumnoQr): Promi
   } catch (error) {
     console.error('Error guardando registro en almacenamiento local:', error);
   }
+}
+
+/**
+ * Convierte un objeto almacenado en localStorage al formato canónico de la interfaz ProspectoAlumno.
+ */
+function mapearRegistroLocalAProspectoAlumno(registro: any): ProspectoAlumno {
+  return {
+    id: String(registro.id || `prosp-${Date.now()}`),
+    universidad_id: String(registro.universidad_id || ''),
+    oportunidad_id: registro.oportunidad_id ? String(registro.oportunidad_id) : null,
+    nombre_completo: String(registro.nombre_completo || 'Sin nombre registrado'),
+    correo_electronico: String(registro.correo_electronico || 'Sin correo registrado'),
+    telefono: registro.telefono ? String(registro.telefono) : null,
+    carrera_id: registro.carrera_id ? String(registro.carrera_id) : null,
+    carrera_texto: registro.carrera_texto ? String(registro.carrera_texto) : (registro.carrera ? String(registro.carrera) : 'Sin carrera registrada'),
+    semestre_actual: typeof registro.semestre_actual === 'number'
+      ? registro.semestre_actual
+      : (typeof registro.semestre === 'number' ? registro.semestre : null),
+    consentimiento_datos: Boolean(registro.consentimiento_datos ?? registro.aviso_privacidad_aceptado ?? true),
+    origen_registro: registro.origen_registro ? String(registro.origen_registro) : 'codigo_qr_evento',
+    estatus: registro.estatus || 'registrado',
+    datos_adicionales: registro.datos_adicionales || {},
+    creado_en: registro.creado_en || registro.fecha_registro || new Date().toISOString(),
+    actualizado_en: registro.actualizado_en || registro.fecha_registro || new Date().toISOString()
+  };
+}
+
+/**
+ * Consulta y retorna todos los prospectos de alumnos registrados para una institución universitaria específica.
+ * Implementa resiliencia híbrida: consulta PostgreSQL en Supabase y recurre al respaldo local si falla la red.
+ */
+export async function obtenerAlumnosPorUniversidad(universidadId: string): Promise<ProspectoAlumno[]> {
+  const idConsulta = MAPA_UUID_ESCUELAS[universidadId] || universidadId;
+
+  try {
+    const conexionDisponible = await verificarConexionSupabase();
+
+    if (conexionDisponible) {
+      const { data, error } = await clienteSupabase
+        .from('prospectos_alumnos')
+        .select('*')
+        .eq('universidad_id', idConsulta)
+        .order('creado_en', { ascending: false });
+
+      if (!error && data) {
+        return data as ProspectoAlumno[];
+      }
+      if (error) {
+        console.warn('Error consultando alumnos por universidad en Supabase:', error.message);
+      }
+    }
+  } catch (error) {
+    console.warn('Fallo de conexión consultando alumnos por universidad:', error);
+  }
+
+  // Respaldo en almacenamiento local
+  try {
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      const serializado = localStorage.getItem(CLAVE_ALMACENAMIENTO_ALUMNOS);
+      if (serializado) {
+        const alumnosLocales: any[] = JSON.parse(serializado);
+        return alumnosLocales
+          .filter((a) => a.universidad_id === universidadId || a.universidad_id === idConsulta)
+          .map(mapearRegistroLocalAProspectoAlumno);
+      }
+    }
+  } catch (error) {
+    console.error('Error leyendo alumnos de almacenamiento local:', error);
+  }
+
+  return [];
+}
+
+/**
+ * Consulta y retorna los prospectos de alumnos captados vinculados a una oportunidad o evento específico.
+ * Implementa resiliencia híbrida: consulta PostgreSQL en Supabase con fallback seguro a localStorage.
+ */
+export async function obtenerAlumnosPorOportunidad(oportunidadId: string): Promise<ProspectoAlumno[]> {
+  try {
+    const conexionDisponible = await verificarConexionSupabase();
+
+    if (conexionDisponible) {
+      const { data, error } = await clienteSupabase
+        .from('prospectos_alumnos')
+        .select('*')
+        .eq('oportunidad_id', oportunidadId)
+        .order('creado_en', { ascending: false });
+
+      if (!error && data) {
+        return data as ProspectoAlumno[];
+      }
+      if (error) {
+        console.warn('Error consultando alumnos por oportunidad en Supabase:', error.message);
+      }
+    }
+  } catch (error) {
+    console.warn('Fallo de conexión consultando alumnos por oportunidad:', error);
+  }
+
+  // Respaldo en almacenamiento local
+  try {
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      const serializado = localStorage.getItem(CLAVE_ALMACENAMIENTO_ALUMNOS);
+      if (serializado) {
+        const alumnosLocales: any[] = JSON.parse(serializado);
+        return alumnosLocales
+          .filter((a) => a.oportunidad_id === oportunidadId)
+          .map(mapearRegistroLocalAProspectoAlumno);
+      }
+    }
+  } catch (error) {
+    console.error('Error leyendo alumnos por oportunidad de almacenamiento local:', error);
+  }
+
+  return [];
+}
+
+/**
+ * Retorna el total consolidado de alumnos captados en toda la plataforma.
+ * Permite alimentar indicadores de impacto comercial y tableros ejecutivos.
+ */
+export async function obtenerTotalAlumnosRegistrados(): Promise<number> {
+  try {
+    const conexionDisponible = await verificarConexionSupabase();
+
+    if (conexionDisponible) {
+      const { count, error } = await clienteSupabase
+        .from('prospectos_alumnos')
+        .select('*', { count: 'exact', head: true });
+
+      if (!error && typeof count === 'number') {
+        return count;
+      }
+      if (error) {
+        console.warn('Error obteniendo conteo de alumnos en Supabase:', error.message);
+      }
+    }
+  } catch (error) {
+    console.warn('Fallo de conexión obteniendo total de alumnos:', error);
+  }
+
+  // Respaldo en almacenamiento local
+  try {
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      const serializado = localStorage.getItem(CLAVE_ALMACENAMIENTO_ALUMNOS);
+      if (serializado) {
+        const alumnosLocales: any[] = JSON.parse(serializado);
+        return Array.isArray(alumnosLocales) ? alumnosLocales.length : 0;
+      }
+    }
+  } catch (error) {
+    console.error('Error leyendo total de alumnos de almacenamiento local:', error);
+  }
+
+  return 0;
 }
 
 /**

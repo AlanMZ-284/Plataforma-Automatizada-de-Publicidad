@@ -70,6 +70,10 @@ El MVP debe cerrar exclusivamente el flujo de ventas entre la institución y el 
    - La base de datos primaria es **PostgreSQL local en Supabase** (puertos 44321 API / 44322 DB).
    - Mantener sincronizado el respaldo seguro en `localStorage` para garantizar tolerancia ante contingencias de red.
 
+6. **Verificación Manual Obligatoria Orientada al Usuario Final:**
+   - En cada tarea completada, el agente orquestador/auditor DEBE proporcionar una guía de prueba manual clara, intuitiva y paso a paso.
+   - No basta con reportar que el código compila técnicamente; el usuario debe poder probar, entender y experimentar el avance en su navegador como lo haría un usuario final real, garantizando usabilidad e intuición total.
+
 ---
 
 ## 4. CHECKLIST OBLIGATORIO ANTES DE ENTREGAR CADA TAREA
@@ -80,6 +84,7 @@ Antes de que cualquier agente reporte una tarea como finalizada, DEBE cumplir es
 - `[ ]` **Cero Emojis:** Verificar que el archivo modificado no introdujo ningún emoji en elementos visuales.
 - `[ ]` **Alineación con la Propuesta:** Verificar que el cambio implementado se apegue a `documentos/PROPUESTA_DEFINITIVA_PAP.md`.
 - `[ ]` **Diseño Develop:** Verificar que la interfaz cumpla con `documentos/guia-identidad-visual-develop.md`.
+- `[ ]` **Guía de Prueba Manual Entregada:** Proveer instrucciones paso a paso para que el usuario compruebe el cambio con sus propios ojos de forma intuitiva.
 
 ---
 
