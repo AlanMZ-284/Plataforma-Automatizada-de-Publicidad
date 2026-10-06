@@ -24,9 +24,15 @@ import {
   FileSpreadsheet,
   Rocket,
   Trophy,
-  Star
+  Star,
+  GraduationCap,
+  Phone,
+  Mail,
+  MessageCircle,
+  Loader2
 } from 'lucide-react';
-import { actualizarEtapaOportunidad } from '../../services/servicioCrm';
+import { actualizarEtapaOportunidad, obtenerAlumnosPorOportunidad } from '../../services/servicioCrm';
+import { ProspectoAlumno } from '../../types/base_datos';
 
 interface DealsPipelineProps {
   deals: Deal[];
@@ -80,6 +86,26 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
   // Estados para validaciones y notificaciones de avance
   const [mensajeValidacion, setMensajeValidacion] = useState<string | null>(null);
   const [alertaExito, setAlertaExito] = useState<{ titulo: string; mensaje: string } | null>(null);
+
+  // Estados para el Modal de Alumnos por Oportunidad
+  const [dealAlumnosSeleccionado, setDealAlumnosSeleccionado] = useState<Deal | null>(null);
+  const [alumnosDeal, setAlumnosDeal] = useState<ProspectoAlumno[]>([]);
+  const [cargandoAlumnosDeal, setCargandoAlumnosDeal] = useState(false);
+
+  // Función para abrir modal y consultar alumnos del evento
+  const abrirModalAlumnosDeal = async (deal: Deal) => {
+    setDealAlumnosSeleccionado(deal);
+    setCargandoAlumnosDeal(true);
+    try {
+      const alumnos = await obtenerAlumnosPorOportunidad(deal.id);
+      setAlumnosDeal(alumnos || []);
+    } catch (error) {
+      console.error('Error al obtener los alumnos del evento:', error);
+      setAlumnosDeal([]);
+    } finally {
+      setCargandoAlumnosDeal(false);
+    }
+  };
 
   // Formulario nuevo trato / oportunidad
   const [newTitle, setNewTitle] = useState('');
@@ -679,17 +705,15 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                           </button>
                         )}
 
-                        {/* Botón directo de Captura QR en Stand */}
-                        {onAbrirRegistroQr && (
-                          <button
-                            type="button"
-                            onClick={() => onAbrirRegistroQr(deal.id)}
-                            className="w-full py-1 px-2 bg-[#640354]/10 hover:bg-[#640354]/15 text-[#640354] rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all border border-[#640354]/20 group-hover:border-[#640354]/30"
-                          >
-                            <QrCode className="w-3.5 h-3.5 text-[#640354]" />
-                            <span>Captura QR Alumnos ({deal.registeredLeadsCount || 0})</span>
-                          </button>
-                        )}
+                        {/* Botón directo de Captura y Consulta de Alumnos QR */}
+                        <button
+                          type="button"
+                          onClick={() => abrirModalAlumnosDeal(deal)}
+                          className="w-full py-1 px-2 bg-[#640354]/10 hover:bg-[#640354]/15 text-[#640354] rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all border border-[#640354]/20 group-hover:border-[#640354]/30"
+                        >
+                          <QrCode className="w-3.5 h-3.5 text-[#640354]" />
+                          <span>Talento QR Alumnos ({deal.registeredLeadsCount || 0})</span>
+                        </button>
                       </div>
                     </div>
                   );
@@ -873,6 +897,182 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CONSULTA Y CAPTURA DE ALUMNOS DEL EVENTO (QR) */}
+      {dealAlumnosSeleccionado && (
+        <div className="fixed inset-0 z-50 bg-[#07052e]/60 backdrop-blur-xs flex items-center justify-center p-3 lg:p-6 animate-fadeIn">
+          <div className="bg-white rounded-[28px] max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col shadow-develop-modal border border-black/10">
+            {/* Cabecera Dark Premium */}
+            <div className="p-4 sm:p-6 premium-dark-surface text-white flex items-center justify-between gap-3 shrink-0 relative border-b border-white/10">
+              <div className="relative z-10 flex items-center gap-3 min-w-0">
+                <div className="w-11 h-11 rounded-2xl bg-white/10 text-white flex items-center justify-center border border-white/20 shadow-develop-glow/30 shrink-0">
+                  <QrCode className="w-5 h-5 text-[#a78bfa]" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] px-2.5 py-0.5 pill-dark font-bold uppercase tracking-wider">
+                      Talento Estudiantil QR
+                    </span>
+                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                      {alumnosDeal.length} registrados
+                    </span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-bold text-white mt-1 truncate" title={dealAlumnosSeleccionado.title}>
+                    {dealAlumnosSeleccionado.title}
+                  </h3>
+                  <p className="text-xs text-white/70 truncate mt-0.5">
+                    {companyMap.get(dealAlumnosSeleccionado.companyId)?.name || 'Institución Universitaria'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="relative z-10 flex items-center gap-2 shrink-0">
+                {onAbrirRegistroQr && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const idDeal = dealAlumnosSeleccionado.id;
+                      setDealAlumnosSeleccionado(null);
+                      onAbrirRegistroQr(idDeal);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#640354] to-[#29008e] hover:brightness-110 text-white text-xs font-bold border border-white/20 transition-all shadow-xs flex items-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">+ Nuevo Registro QR</span>
+                    <span className="sm:hidden">+ QR</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setDealAlumnosSeleccionado(null)}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white flex items-center justify-center transition-colors border border-white/10"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Cuerpo del Modal con scroll */}
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4 bg-white">
+              {cargandoAlumnosDeal ? (
+                <div className="flex flex-col items-center justify-center py-16 space-y-3">
+                  <Loader2 className="w-8 h-8 text-[#29008e] animate-spin" />
+                  <span className="text-xs text-[#555555] font-medium">
+                    Cargando alumnos de este evento...
+                  </span>
+                </div>
+              ) : alumnosDeal.length === 0 ? (
+                <div className="card-light p-8 text-center rounded-2xl space-y-3 border border-black/5">
+                  <div className="w-12 h-12 mx-auto rounded-2xl bg-[#0f094f]/5 text-[#0f094f] flex items-center justify-center">
+                    <QrCode className="w-6 h-6 text-[#29008e]" />
+                  </div>
+                  <div className="max-w-md mx-auto">
+                    <h5 className="font-bold text-sm text-[#111111]">Sin Alumnos Registrados en este Evento</h5>
+                    <p className="text-xs text-[#666666] mt-1 leading-relaxed">
+                      Aún no hay alumnos registrados para este acuerdo específico. Puedes abrir el formulario de captura QR desde el stand del campus para registrar talento en tiempo real.
+                    </p>
+                    {onAbrirRegistroQr && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const idDeal = dealAlumnosSeleccionado.id;
+                          setDealAlumnosSeleccionado(null);
+                          onAbrirRegistroQr(idDeal);
+                        }}
+                        className="mt-4 px-4 py-2 btn-primary-develop text-xs font-bold inline-flex items-center gap-1.5 shadow-xs"
+                      >
+                        <QrCode className="w-3.5 h-3.5" />
+                        <span>Abrir Formulario de Captura QR</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {alumnosDeal.map((alumno) => {
+                    const soloNumeros = alumno.telefono ? alumno.telefono.replace(/\D/g, '') : '';
+                    const telLimpio = soloNumeros.startsWith('52') && soloNumeros.length >= 12
+                      ? soloNumeros.substring(2)
+                      : soloNumeros;
+                    const primerNombre = alumno.nombre_completo.split(' ')[0] || alumno.nombre_completo;
+                    const urlWhatsapp = alumno.telefono
+                      ? `https://wa.me/52${telLimpio}?text=Hola%20${encodeURIComponent(primerNombre)}%2C%20te%20contactamos%20de%20Develop...`
+                      : null;
+
+                    return (
+                      <div
+                        key={alumno.id}
+                        className="card-light p-4 rounded-2xl flex flex-col justify-between border border-black/5 hover:border-[#29008e]/30 transition-all shadow-xs"
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <h5 className="font-bold text-xs text-[#111111] truncate min-w-0" title={alumno.nombre_completo}>
+                              {alumno.nombre_completo}
+                            </h5>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-[#640354]/10 text-[#640354] border border-[#640354]/20 shrink-0">
+                              Registrado QR
+                            </span>
+                          </div>
+
+                          <div className="text-[11px] text-[#555555] flex items-center gap-1.5 truncate" title={alumno.carrera_texto || 'Carrera general'}>
+                            <GraduationCap className="w-3.5 h-3.5 text-[#29008e] shrink-0" />
+                            <span className="truncate">{alumno.carrera_texto || 'Carrera general'}</span>
+                          </div>
+
+                          {alumno.semestre_actual && (
+                            <div className="text-[11px] text-[#555555] flex items-center gap-1.5">
+                              <Calendar className="w-3 h-3 text-[#888888] shrink-0" />
+                              <span>Semestre: <strong>{alumno.semestre_actual}°</strong></span>
+                            </div>
+                          )}
+
+                          <div className="pt-2 border-t border-black/5 space-y-1 text-[11px] text-[#555555]">
+                            <div className="flex items-center gap-1.5 truncate">
+                              <Mail className="w-3 h-3 text-[#888888] shrink-0" />
+                              <a
+                                href={`mailto:${alumno.correo_electronico}`}
+                                className="text-[#0f094f] hover:text-[#29008e] hover:underline truncate font-medium"
+                              >
+                                {alumno.correo_electronico}
+                              </a>
+                            </div>
+
+                            {alumno.telefono && (
+                              <div className="flex items-center gap-1.5">
+                                <Phone className="w-3 h-3 text-[#888888] shrink-0" />
+                                <a
+                                  href={`tel:${alumno.telefono}`}
+                                  className="text-[#0f094f] hover:text-[#29008e] hover:underline font-medium"
+                                >
+                                  {alumno.telefono}
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {urlWhatsapp && (
+                          <div className="mt-3 pt-2.5 border-t border-black/5 flex justify-end">
+                            <a
+                              href={urlWhatsapp}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-xs"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" />
+                              <span>WhatsApp</span>
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
