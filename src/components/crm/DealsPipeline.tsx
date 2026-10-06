@@ -972,22 +972,8 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                   <div className="max-w-md mx-auto">
                     <h5 className="font-bold text-sm text-[#111111]">Sin Alumnos Registrados en este Evento</h5>
                     <p className="text-xs text-[#666666] mt-1 leading-relaxed">
-                      Aún no hay alumnos registrados para este acuerdo específico. Puedes abrir el formulario de captura QR desde el stand del campus para registrar talento en tiempo real.
+                      Aún no hay alumnos registrados para este acuerdo específico. Utiliza el botón <span className="font-semibold text-[#0f094f]">+ Nuevo Registro QR</span> en la esquina superior para registrar talento en tiempo real desde el stand del campus.
                     </p>
-                    {onAbrirRegistroQr && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const idDeal = dealAlumnosSeleccionado.id;
-                          setDealAlumnosSeleccionado(null);
-                          onAbrirRegistroQr(idDeal);
-                        }}
-                        className="mt-4 px-4 py-2 btn-primary-develop text-xs font-bold inline-flex items-center gap-1.5 shadow-xs"
-                      >
-                        <QrCode className="w-3.5 h-3.5" />
-                        <span>Abrir Formulario de Captura QR</span>
-                      </button>
-                    )}
                   </div>
                 </div>
               ) : (
