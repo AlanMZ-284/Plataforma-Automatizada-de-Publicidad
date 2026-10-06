@@ -20,6 +20,10 @@ Antes de proponer, diseñar, codificar o refactorizar cualquier archivo, el agen
    - **Rutas:** [`src/types/base_datos_supabase.ts`](file:///c:/Users/alanm/pruebas/CRM/src/types/base_datos_supabase.ts) y [`src/types/base_datos.ts`](file:///c:/Users/alanm/pruebas/CRM/src/types/base_datos.ts)
    - **Mandato:** Respetar los tipos generados de PostgreSQL local en Supabase, tablas en español y nombres en snake_case.
 
+4. **Memoria Técnica y Bitácora del Proyecto:**
+   - **Ruta:** [`documentos/MEMORIA_DEL_PROYECTO.md`](file:///c:/Users/alanm/pruebas/CRM/documentos/MEMORIA_DEL_PROYECTO.md)
+   - **Mandato:** Consultar el inventario de lo construido, antecedentes de gobernanza y tareas pendientes de la Fase 1 antes de planificar cualquier cambio.
+
 ---
 
 ## 2. ALCANCE CONGELADO: FASE 1 (MVP PUNTO A PUNTO B2B2C)
