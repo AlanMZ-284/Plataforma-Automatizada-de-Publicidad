@@ -111,6 +111,11 @@ export function App() {
   // Estado para abrir ficha modal de escuela específica desde cualquier módulo
   const [selectedSchoolDetailId, setSelectedSchoolDetailId] = useState<string | null>(null);
 
+  // Estados para la ruta precargada
+  const [escuelaRutaSeleccionadaId, setEscuelaRutaSeleccionadaId] = useState<string | null>(null);
+  const [fechaRutaSeleccionada, setFechaRutaSeleccionada] = useState<string | undefined>(undefined);
+  const [asesorRutaSeleccionada, setAsesorRutaSeleccionada] = useState<string | undefined>(undefined);
+
   // Estado para kit comercial activo seleccionado desde el CRM o directamente
   const [activeEventKitDealId, setActiveEventKitDealId] = useState<string | null>(deals[0]?.id || null);
 
@@ -401,6 +406,13 @@ export function App() {
   const handleOpenSchoolInCRM = (schoolId: string) => {
     setSelectedSchoolDetailId(schoolId);
     setCurrentView('crm-schools');
+  };
+
+  const handleTrazarRutaParaEscuela = (escuelaId: string, fecha?: string, asesor?: string) => {
+    setEscuelaRutaSeleccionadaId(escuelaId);
+    if (fecha) setFechaRutaSeleccionada(fecha);
+    if (asesor) setAsesorRutaSeleccionada(asesor);
+    setCurrentView('routes');
   };
 
   const navItems = [
@@ -739,6 +751,7 @@ export function App() {
                 }}
                 onCargarSemilla={manejarCargarSemilla}
                 onIrAImportar={() => setCurrentView('crm-schools')}
+                onTrazarRuta={handleTrazarRutaParaEscuela}
               />
             )}
 
@@ -749,7 +762,7 @@ export function App() {
                 deals={deals}
                 activities={activities}
                 onAddActivity={handleAddActivity}
-                onNavigateToRoutePlanner={() => setCurrentView('routes')}
+                onNavigateToRoutePlanner={() => handleTrazarRutaParaEscuela(selectedSchoolDetailId || '')}
                 selectedCompanyId={selectedSchoolDetailId}
                 onCloseCompanyDetail={() => setSelectedSchoolDetailId(null)}
                 onOpenCompanyDetail={(id) => setSelectedSchoolDetailId(id)}
@@ -764,6 +777,14 @@ export function App() {
                 schools={companies}
                 onSelectSchoolForCRM={handleOpenSchoolInCRM}
                 onLogRouteToCRM={handleLogRouteToCRM}
+                escuelaPreseleccionadaId={escuelaRutaSeleccionadaId}
+                fechaPreseleccionada={fechaRutaSeleccionada}
+                asesorPreseleccionado={asesorRutaSeleccionada}
+                onLimpiarEscuelaPreseleccionada={() => {
+                  setEscuelaRutaSeleccionadaId(null);
+                  setFechaRutaSeleccionada(undefined);
+                  setAsesorRutaSeleccionada(undefined);
+                }}
               />
             )}
 

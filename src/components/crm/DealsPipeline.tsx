@@ -28,8 +28,9 @@ import {
   GraduationCap,
   Phone,
   Mail,
-  MessageCircle,
-  Loader2
+  MessageCircle, 
+  Loader2,
+  Navigation
 } from 'lucide-react';
 import { actualizarEtapaOportunidad, obtenerAlumnosPorOportunidad } from '../../services/servicioCrm';
 import { ProspectoAlumno } from '../../types/base_datos';
@@ -45,6 +46,7 @@ interface DealsPipelineProps {
   onAbrirRegistroQr?: (dealId: string) => void;
   onCargarSemilla?: () => void;
   onIrAImportar?: () => void;
+  onTrazarRuta?: (schoolId: string, fecha?: string, asesor?: string) => void;
 }
 
 // 6 etapas con colores armónicos alineados a la identidad visual Develop
@@ -75,7 +77,8 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
   onAddActivity,
   onAbrirRegistroQr,
   onCargarSemilla,
-  onIrAImportar
+  onIrAImportar,
+  onTrazarRuta
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRep, setSelectedRep] = useState('todos');
@@ -702,6 +705,25 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                           >
                             <Sparkles className="w-3.5 h-3.5 text-[#29008e]" />
                             <span className="truncate">Ver Kit & Materiales ({deal.eventType.replace('_', ' ')})</span>
+                          </button>
+                        )}
+
+                        {/* Botón Trazar Ruta Logística */}
+                        {onTrazarRuta && (
+                          <button
+                            type="button"
+                            onClick={() => onTrazarRuta(deal.companyId, deal.expectedCloseDate, deal.assignedRep)}
+                            className={`w-full py-1 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all border ${
+                              deal.stage === 'agendado'
+                                ? 'bg-gradient-to-r from-[#29008e] to-[#640354] hover:brightness-110 text-white border-transparent shadow-xs'
+                                : 'bg-[#29008e]/5 hover:bg-[#29008e]/10 text-[#29008e] border-[#29008e]/15'
+                            }`}
+                            title="Calcular circuito logístico, viáticos y navegación GPS"
+                          >
+                            <Navigation className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">
+                              {deal.stage === 'agendado' ? 'Planificar Ruta de Visita' : 'Trazar en Ruta'}
+                            </span>
                           </button>
                         )}
 
