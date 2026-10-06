@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Company, Contact, Deal, Activity, CompanyType, ProjectModality } from '../../types';
 import { 
   Building2, 
@@ -12,6 +12,7 @@ import {
   Calendar, 
   Plus, 
   CheckCircle, 
+  CheckCircle2,
   FileText, 
   Navigation, 
   X, 
@@ -23,15 +24,20 @@ import {
   RefreshCw,
   Loader2,
   Edit3,
-  Star
+  Star,
+  Clock,
+  MessageCircle,
+  ExternalLink,
+  QrCode
 } from 'lucide-react';
 import { ModalImportarExcel } from './ModalImportarExcel';
 import { transformarUniversidadACompania } from '../../utils/lectorExcelUniversidades';
-import { Universidad } from '../../types/base_datos';
+import { Universidad, ProspectoAlumno } from '../../types/base_datos';
 import {
   insertarUniversidadesEnBD,
   guardarContactoUniversidadEnBD,
-  actualizarUniversidadEnBD
+  actualizarUniversidadEnBD,
+  obtenerAlumnosPorUniversidad
 } from '../../services/servicioCrm';
 
 interface CompaniesListProps {
@@ -132,6 +138,59 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
       setActiveModalCompanyId(selectedCompanyId);
     }
   }, [selectedCompanyId]);
+
+  // Estados reactivos para la consulta de talento estudiantil captado (QR)
+  const [alumnosCaptados, setAlumnosCaptados] = useState<ProspectoAlumno[]>([]);
+  const [cargandoAlumnos, setCargandoAlumnos] = useState(false);
+  const [pestanaExpediente, setPestanaExpediente] = useState<'actividades' | 'alumnos'>('actividades');
+  const [busquedaAlumnos, setBusquedaAlumnos] = useState('');
+
+  // Efecto para cargar alumnos al abrir o alternar el Expediente 360°
+  useEffect(() => {
+    let activo = true;
+
+    if (activeModalCompanyId) {
+      setCargandoAlumnos(true);
+      obtenerAlumnosPorUniversidad(activeModalCompanyId)
+        .then((resultado) => {
+          if (activo) {
+            setAlumnosCaptados(resultado || []);
+          }
+        })
+        .catch((error) => {
+          console.error('Error al consultar alumnos para la institución:', error);
+          if (activo) {
+            setAlumnosCaptados([]);
+          }
+        })
+        .finally(() => {
+          if (activo) {
+            setCargandoAlumnos(false);
+          }
+        });
+    } else {
+      setAlumnosCaptados([]);
+      setPestanaExpediente('actividades');
+      setBusquedaAlumnos('');
+    }
+
+    return () => {
+      activo = false;
+    };
+  }, [activeModalCompanyId]);
+
+  // Filtro reactivo de alumnos captados por nombre, carrera o correo
+  const alumnosFiltrados = useMemo(() => {
+    if (!busquedaAlumnos.trim()) return alumnosCaptados;
+    const termino = busquedaAlumnos.toLowerCase();
+    return alumnosCaptados.filter(
+      (a) =>
+        (a.nombre_completo && a.nombre_completo.toLowerCase().includes(termino)) ||
+        (a.carrera_texto && a.carrera_texto.toLowerCase().includes(termino)) ||
+        (a.correo_electronico && a.correo_electronico.toLowerCase().includes(termino)) ||
+        (a.telefono && a.telefono.includes(termino))
+    );
+  }, [alumnosCaptados, busquedaAlumnos]);
 
   const abrirModalEdicion = (empresa: Company) => {
     setFormEditNombre(empresa.name);
@@ -917,111 +976,319 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
                 </div>
               </div>
 
-              {/* Columna Derecha: Timeline de Actividades y Registro Inmediato */}
-              <div className="lg:col-span-8 p-4 sm:p-6 space-y-6 flex flex-col bg-white">
-                {/* Formulario Rápido de Registro de Interacción */}
-                <div className="card-light p-5 space-y-3.5 rounded-2xl">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <span className="text-xs font-bold text-[#111111] flex items-center gap-1.5">
-                      <Plus className="w-4 h-4 text-[#29008e]" />
-                      Registrar Nueva Interacción con la Universidad
+              {/* Columna Derecha: Timeline de Actividades y Talento Estudiantil */}
+              <div className="lg:col-span-8 p-4 sm:p-6 space-y-5 flex flex-col bg-white">
+                {/* Selector de Pestañas del Expediente 360° */}
+                <div className="flex items-center gap-2 border-b border-black/5 pb-3">
+                  <button
+                    type="button"
+                    onClick={() => setPestanaExpediente('actividades')}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+                      pestanaExpediente === 'actividades'
+                        ? 'btn-primary-develop shadow-xs'
+                        : 'bg-[#F8F8FC] hover:bg-black/5 text-[#555555] border border-black/5'
+                    }`}
+                  >
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>Bitácora & Interacciones</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      pestanaExpediente === 'actividades'
+                        ? 'bg-white/20 text-white'
+                        : 'bg-black/5 text-[#555555]'
+                    }`}>
+                      {companyActivities.length}
                     </span>
-                    <div className="flex items-center gap-1 overflow-x-auto">
-                      {(['call', 'meeting', 'email', 'note', 'task'] as const).map((t) => (
-                        <button
-                          key={t}
-                          onClick={() => setActivityType(t)}
-                          className={`text-xs px-3 py-1 rounded-lg font-semibold capitalize shrink-0 whitespace-nowrap transition-all ${
-                            activityType === t
-                              ? 'btn-primary-develop shadow-xs'
-                              : 'bg-black/5 text-[#555555] hover:bg-black/10'
-                          }`}
-                        >
-                          {t === 'call' ? 'Llamada' : t === 'meeting' ? 'Reunión' : t === 'email' ? 'Email' : t === 'note' ? 'Nota' : 'Tarea'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                  </button>
 
-                  <form onSubmit={handleCreateActivity} className="space-y-3 text-xs">
-                    <input
-                      type="text"
-                      required
-                      placeholder={
-                        activityType === 'call'
-                          ? 'Ej: Llamada con Rectoría sobre firma de convenio dual...'
-                          : activityType === 'meeting'
-                          ? 'Ej: Reunión presencial para mostrar kit de hackathon...'
-                          : 'Asunto o resumen breve...'
-                      }
-                      value={activityTitle}
-                      onChange={(e) => setActivityTitle(e.target.value)}
-                      className="input-develop w-full"
-                    />
-                    <textarea
-                      rows={2}
-                      placeholder="Detalles institucionales, compromisos acordados, siguientes pasos..."
-                      value={activityDesc}
-                      onChange={(e) => setActivityDesc(e.target.value)}
-                      className="input-develop w-full"
-                    />
-                    <div className="flex justify-end">
-                      <button
-                        type="submit"
-                        className="btn-primary-develop px-5 py-2 font-bold shadow-xs"
-                      >
-                        Guardar en Expediente
-                      </button>
-                    </div>
-                  </form>
+                  <button
+                    type="button"
+                    onClick={() => setPestanaExpediente('alumnos')}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+                      pestanaExpediente === 'alumnos'
+                        ? 'btn-primary-develop shadow-xs'
+                        : 'bg-[#F8F8FC] hover:bg-black/5 text-[#555555] border border-black/5'
+                    }`}
+                  >
+                    <GraduationCap className="w-4 h-4" />
+                    <span>Talento Estudiantil Captado</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      pestanaExpediente === 'alumnos'
+                        ? 'bg-white/20 text-white'
+                        : 'bg-emerald-100 text-emerald-800'
+                    }`}>
+                      {alumnosCaptados.length}
+                    </span>
+                  </button>
                 </div>
 
-                {/* Timeline Cronológico de Interacciones */}
-                <div className="space-y-3.5 flex-1">
-                  <h4 className="text-[10px] font-bold uppercase text-[#888888] tracking-widest">
-                    Línea de Tiempo & Registro Histórico
-                  </h4>
-
-                  <div className="space-y-3">
-                    {companyActivities.map((act) => (
-                      <div
-                        key={act.id}
-                        className="p-4 bg-white rounded-2xl border border-black/5 shadow-xs flex items-start gap-3.5"
-                      >
-                        <div className={`p-2.5 rounded-xl text-white shrink-0 ${
-                          act.type === 'call' ? 'bg-[#0f094f]' :
-                          act.type === 'meeting' ? 'bg-[#29008e]' :
-                          act.type === 'email' ? 'bg-[#640354]' :
-                          act.type === 'task' ? 'bg-[#6d28d9]' : 'bg-[#555555]'
-                        }`}>
-                          {act.type === 'call' && <Phone className="w-4 h-4" />}
-                          {act.type === 'meeting' && <Calendar className="w-4 h-4" />}
-                          {act.type === 'email' && <Mail className="w-4 h-4" />}
-                          {act.type === 'task' && <CheckCircle className="w-4 h-4" />}
-                          {act.type === 'note' && <FileText className="w-4 h-4" />}
-                        </div>
-
-                        <div className="flex-1 min-w-0 text-xs">
-                          <div className="flex items-start sm:items-center justify-between gap-2">
-                            <span className="font-bold text-[#111111] truncate">{act.title}</span>
-                            <span className="text-[10px] text-[#888888] font-mono shrink-0">{act.date}</span>
-                          </div>
-                          <p className="text-[#555555] mt-1 leading-relaxed">{act.description}</p>
-                          <div className="text-[10px] text-[#888888] mt-2 flex items-center gap-1.5">
-                            <span>Registrado por:</span>
-                            <strong className="text-[#0f094f] font-semibold">{act.author}</strong>
-                          </div>
+                {/* PESTAÑA 1: BITÁCORA & INTERACCIONES */}
+                {pestanaExpediente === 'actividades' && (
+                  <div className="space-y-6">
+                    {/* Formulario Rápido de Registro de Interacción */}
+                    <div className="card-light p-5 space-y-3.5 rounded-2xl">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <span className="text-xs font-bold text-[#111111] flex items-center gap-1.5">
+                          <Plus className="w-4 h-4 text-[#29008e]" />
+                          Registrar Nueva Interacción con la Universidad
+                        </span>
+                        <div className="flex items-center gap-1 overflow-x-auto">
+                          {(['call', 'meeting', 'email', 'note', 'task'] as const).map((t) => (
+                            <button
+                              key={t}
+                              onClick={() => setActivityType(t)}
+                              className={`text-xs px-3 py-1 rounded-lg font-semibold capitalize shrink-0 whitespace-nowrap transition-all ${
+                                activityType === t
+                                  ? 'btn-primary-develop shadow-xs'
+                                  : 'bg-black/5 text-[#555555] hover:bg-black/10'
+                              }`}
+                            >
+                              {t === 'call' ? 'Llamada' : t === 'meeting' ? 'Reunión' : t === 'email' ? 'Email' : t === 'note' ? 'Nota' : 'Tarea'}
+                            </button>
+                          ))}
                         </div>
                       </div>
-                    ))}
 
-                    {companyActivities.length === 0 && (
-                      <div className="text-center py-10 text-[#888888] text-xs card-light rounded-2xl">
-                        No hay actividades registradas recientemente en este expediente.
+                      <form onSubmit={handleCreateActivity} className="space-y-3 text-xs">
+                        <input
+                          type="text"
+                          required
+                          placeholder={
+                            activityType === 'call'
+                              ? 'Ej: Llamada con Rectoría sobre firma de convenio dual...'
+                              : activityType === 'meeting'
+                              ? 'Ej: Reunión presencial para mostrar kit de hackathon...'
+                              : 'Asunto o resumen breve...'
+                          }
+                          value={activityTitle}
+                          onChange={(e) => setActivityTitle(e.target.value)}
+                          className="input-develop w-full"
+                        />
+                        <textarea
+                          rows={2}
+                          placeholder="Detalles institucionales, compromisos acordados, siguientes pasos..."
+                          value={activityDesc}
+                          onChange={(e) => setActivityDesc(e.target.value)}
+                          className="input-develop w-full"
+                        />
+                        <div className="flex justify-end">
+                          <button
+                            type="submit"
+                            className="btn-primary-develop px-5 py-2 font-bold shadow-xs"
+                          >
+                            Guardar en Expediente
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+
+                    {/* Timeline Cronológico de Interacciones */}
+                    <div className="space-y-3.5 flex-1">
+                      <h4 className="text-[10px] font-bold uppercase text-[#888888] tracking-widest">
+                        Línea de Tiempo & Registro Histórico
+                      </h4>
+
+                      <div className="space-y-3">
+                        {companyActivities.map((act) => (
+                          <div
+                            key={act.id}
+                            className="p-4 bg-white rounded-2xl border border-black/5 shadow-xs flex items-start gap-3.5"
+                          >
+                            <div className={`p-2.5 rounded-xl text-white shrink-0 ${
+                              act.type === 'call' ? 'bg-[#0f094f]' :
+                              act.type === 'meeting' ? 'bg-[#29008e]' :
+                              act.type === 'email' ? 'bg-[#640354]' :
+                              act.type === 'task' ? 'bg-[#6d28d9]' : 'bg-[#555555]'
+                            }`}>
+                              {act.type === 'call' && <Phone className="w-4 h-4" />}
+                              {act.type === 'meeting' && <Calendar className="w-4 h-4" />}
+                              {act.type === 'email' && <Mail className="w-4 h-4" />}
+                              {act.type === 'task' && <CheckCircle className="w-4 h-4" />}
+                              {act.type === 'note' && <FileText className="w-4 h-4" />}
+                            </div>
+
+                            <div className="flex-1 min-w-0 text-xs">
+                              <div className="flex items-start sm:items-center justify-between gap-2">
+                                <span className="font-bold text-[#111111] truncate">{act.title}</span>
+                                <span className="text-[10px] text-[#888888] font-mono shrink-0">{act.date}</span>
+                              </div>
+                              <p className="text-[#555555] mt-1 leading-relaxed">{act.description}</p>
+                              <div className="text-[10px] text-[#888888] mt-2 flex items-center gap-1.5">
+                                <span>Registrado por:</span>
+                                <strong className="text-[#0f094f] font-semibold">{act.author}</strong>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+
+                        {companyActivities.length === 0 && (
+                          <div className="text-center py-10 text-[#888888] text-xs card-light rounded-2xl">
+                            No hay actividades registradas recientemente en este expediente.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* PESTAÑA 2: TALENTO ESTUDIANTIL CAPTADO (QR) */}
+                {pestanaExpediente === 'alumnos' && (
+                  <div className="space-y-4 flex-1">
+                    {/* Barra de búsqueda por nombre, carrera o correo */}
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <Search className="w-3.5 h-3.5 text-[#888888] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <input
+                          type="text"
+                          placeholder="Buscar por nombre, carrera o correo..."
+                          value={busquedaAlumnos}
+                          onChange={(e) => setBusquedaAlumnos(e.target.value)}
+                          className="input-develop w-full pl-9 text-xs"
+                        />
+                      </div>
+                      {busquedaAlumnos && (
+                        <button
+                          type="button"
+                          onClick={() => setBusquedaAlumnos('')}
+                          className="px-3 py-2 text-xs font-semibold text-[#555555] hover:text-[#111111] bg-black/5 rounded-xl transition-colors"
+                        >
+                          Limpiar
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Estado de carga */}
+                    {cargandoAlumnos ? (
+                      <div className="flex flex-col items-center justify-center py-16 space-y-3">
+                        <Loader2 className="w-8 h-8 text-[#29008e] animate-spin" />
+                        <span className="text-xs text-[#555555] font-medium">
+                          Consultando alumnos registrados en PostgreSQL...
+                        </span>
+                      </div>
+                    ) : alumnosCaptados.length === 0 ? (
+                      /* Estado vacío cuando la universidad no tiene alumnos registrados */
+                      <div className="card-light p-8 text-center rounded-2xl space-y-3 border border-black/5">
+                        <div className="w-12 h-12 mx-auto rounded-2xl bg-[#0f094f]/5 text-[#0f094f] flex items-center justify-center">
+                          <QrCode className="w-6 h-6 text-[#29008e]" />
+                        </div>
+                        <div className="max-w-md mx-auto">
+                          <h5 className="font-bold text-sm text-[#111111]">Sin Prospectos Estudiantiles Captados</h5>
+                          <p className="text-xs text-[#666666] mt-1 leading-relaxed">
+                            Aún no hay prospectos captados vía QR para esta institución. Puedes compartir el código QR en el stand del campus durante las activaciones para registrar talento en tiempo real.
+                          </p>
+                        </div>
+                      </div>
+                    ) : alumnosFiltrados.length === 0 ? (
+                      /* Estado vacío cuando el filtro no coincide */
+                      <div className="card-light p-8 text-center rounded-2xl border border-black/5">
+                        <p className="text-xs text-[#888888]">
+                          No se encontraron alumnos que coincidan con "{busquedaAlumnos}".
+                        </p>
+                      </div>
+                    ) : (
+                      /* Cuadrícula de tarjetas de alumnos */
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                        {alumnosFiltrados.map((alumno) => {
+                          const badge = (() => {
+                            switch (alumno.estatus) {
+                              case 'contactado':
+                                return { etiqueta: 'Contactado', clases: 'bg-blue-50 text-blue-700 border-blue-200' };
+                              case 'interesado':
+                                return { etiqueta: 'Interesado', clases: 'bg-purple-50 text-purple-700 border-purple-200' };
+                              case 'inscrito':
+                                return { etiqueta: 'Inscrito', clases: 'bg-emerald-50 text-emerald-800 border-emerald-200' };
+                              case 'descartado':
+                                return { etiqueta: 'Descartado', clases: 'bg-black/5 text-[#555555] border-black/10' };
+                              case 'registrado':
+                              default:
+                                return { etiqueta: 'Registrado QR', clases: 'bg-[#640354]/10 text-[#640354] border-[#640354]/20' };
+                            }
+                          })();
+
+                          const soloNumeros = alumno.telefono ? alumno.telefono.replace(/\D/g, '') : '';
+                          const telLimpio = soloNumeros.startsWith('52') && soloNumeros.length >= 12
+                            ? soloNumeros.substring(2)
+                            : soloNumeros;
+                          const primerNombre = alumno.nombre_completo.split(' ')[0] || alumno.nombre_completo;
+                          const urlWhatsapp = alumno.telefono
+                            ? `https://wa.me/52${telLimpio}?text=Hola%20${encodeURIComponent(primerNombre)}%2C%20te%20contactamos%20de%20Develop...`
+                            : null;
+
+                          return (
+                            <div
+                              key={alumno.id}
+                              className="card-light p-4 rounded-2xl flex flex-col justify-between border border-black/5 hover:border-[#29008e]/30 transition-all shadow-xs"
+                            >
+                              <div className="space-y-2.5">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="min-w-0">
+                                    <h5 className="font-bold text-xs text-[#111111] truncate" title={alumno.nombre_completo}>
+                                      {alumno.nombre_completo}
+                                    </h5>
+                                    <div
+                                      className="text-[11px] text-[#555555] flex items-center gap-1 mt-0.5 truncate"
+                                      title={alumno.carrera_texto || 'Carrera sin registrar'}
+                                    >
+                                      <GraduationCap className="w-3.5 h-3.5 text-[#29008e] shrink-0" />
+                                      <span className="truncate">{alumno.carrera_texto || 'Carrera sin registrar'}</span>
+                                    </div>
+                                  </div>
+                                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border shrink-0 ${badge.clases}`}>
+                                    {badge.etiqueta}
+                                  </span>
+                                </div>
+
+                                <div className="pt-2 border-t border-black/5 space-y-1.5 text-[11px] text-[#555555]">
+                                  {alumno.semestre_actual && (
+                                    <div className="flex items-center gap-1.5">
+                                      <Calendar className="w-3 h-3 text-[#888888] shrink-0" />
+                                      <span>Semestre: <strong>{alumno.semestre_actual}°</strong></span>
+                                    </div>
+                                  )}
+
+                                  <div className="flex items-center gap-1.5 truncate">
+                                    <Mail className="w-3 h-3 text-[#888888] shrink-0" />
+                                    <a
+                                      href={`mailto:${alumno.correo_electronico}`}
+                                      className="text-[#0f094f] hover:text-[#29008e] hover:underline truncate font-medium"
+                                    >
+                                      {alumno.correo_electronico}
+                                    </a>
+                                  </div>
+
+                                  {alumno.telefono && (
+                                    <div className="flex items-center gap-1.5">
+                                      <Phone className="w-3 h-3 text-[#888888] shrink-0" />
+                                      <a
+                                        href={`tel:${alumno.telefono}`}
+                                        className="text-[#0f094f] hover:text-[#29008e] hover:underline font-medium"
+                                      >
+                                        {alumno.telefono}
+                                      </a>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {urlWhatsapp && (
+                                <div className="mt-3 pt-2.5 border-t border-black/5 flex justify-end">
+                                  <a
+                                    href={urlWhatsapp}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-xs"
+                                  >
+                                    <MessageCircle className="w-3.5 h-3.5" />
+                                    <span>WhatsApp</span>
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
-                </div>
+                )}
               </div>
             </div>
           </div>
