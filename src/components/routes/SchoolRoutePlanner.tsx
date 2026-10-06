@@ -29,7 +29,8 @@ import {
   Car,
   Search,
   FileSpreadsheet,
-  FlagTriangleRight
+  FlagTriangleRight,
+  QrCode
 } from 'lucide-react';
 
 interface SchoolRoutePlannerProps {
@@ -40,6 +41,7 @@ interface SchoolRoutePlannerProps {
   fechaPreseleccionada?: string;
   asesorPreseleccionado?: string;
   onLimpiarEscuelaPreseleccionada?: () => void;
+  onAbrirStandQr?: (schoolId: string) => void;
 }
 
 export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
@@ -49,7 +51,8 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
   escuelaPreseleccionadaId,
   fechaPreseleccionada,
   asesorPreseleccionado,
-  onLimpiarEscuelaPreseleccionada
+  onLimpiarEscuelaPreseleccionada,
+  onAbrirStandQr
 }) => {
   const [selectedOriginIndex, setSelectedOriginIndex] = useState<number>(0);
   const [filterState, setFilterState] = useState<string>('Estado de México');
@@ -257,15 +260,28 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
             </div>
           </div>
 
-          {onLimpiarEscuelaPreseleccionada && (
-            <button
-              type="button"
-              onClick={onLimpiarEscuelaPreseleccionada}
-              className="px-3.5 py-2 text-xs font-bold text-[#0f094f] bg-white border border-[#29008e]/20 rounded-xl hover:bg-[#0f094f]/5 transition-colors shrink-0 self-start sm:self-auto cursor-pointer"
-            >
-              Ver todas las sedes
-            </button>
-          )}
+          <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
+            {onAbrirStandQr && escuelaPreseleccionada && (
+              <button
+                type="button"
+                onClick={() => onAbrirStandQr(escuelaPreseleccionada.id)}
+                className="px-3.5 py-2 text-xs font-bold text-white bg-gradient-to-r from-[#640354] to-[#29008e] hover:brightness-110 rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                title="Abrir formulario o stand de registro QR para estudiantes"
+              >
+                <QrCode className="w-3.5 h-3.5" />
+                <span>Abrir Stand QR</span>
+              </button>
+            )}
+            {onLimpiarEscuelaPreseleccionada && (
+              <button
+                type="button"
+                onClick={onLimpiarEscuelaPreseleccionada}
+                className="px-3.5 py-2 text-xs font-bold text-[#0f094f] bg-white border border-[#29008e]/20 rounded-xl hover:bg-[#0f094f]/5 transition-colors cursor-pointer"
+              >
+                Ver todas las sedes
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -755,6 +771,18 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
                           >
                             <Building2 className="w-3.5 h-3.5 text-[#a78bfa]" />
                             Ficha CRM
+                          </button>
+                        )}
+
+                        {onAbrirStandQr && (
+                          <button
+                            type="button"
+                            onClick={() => onAbrirStandQr(stop.universidad_id)}
+                            className="px-3 py-1.5 rounded-xl bg-[#640354]/10 hover:bg-[#640354]/15 text-[#640354] border border-[#640354]/20 text-xs font-bold flex items-center gap-1 shrink-0 transition-colors"
+                            title="Desplegar stand digital QR de esta sede"
+                          >
+                            <QrCode className="w-3.5 h-3.5 text-[#640354]" />
+                            Stand QR
                           </button>
                         )}
                       </div>

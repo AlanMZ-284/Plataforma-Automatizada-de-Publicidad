@@ -415,6 +415,14 @@ export function App() {
     setCurrentView('routes');
   };
 
+  const handleAbrirStandQrDesdeRuta = (schoolId: string) => {
+    const tratoCorrespondiente = deals.find((d) => d.companyId === schoolId) || deals[0];
+    if (tratoCorrespondiente) {
+      setActiveQrDealId(tratoCorrespondiente.id);
+    }
+    setModalQrAbierto(true);
+  };
+
   const navItems = [
     { id: 'crm-pipeline' as MainView, label: 'Pipeline de Ventas', shortLabel: 'Pipeline', icon: LayoutDashboard },
     { id: 'crm-schools' as MainView, label: 'Directorio 360°', shortLabel: 'Directorio', icon: Building2 },
@@ -785,6 +793,7 @@ export function App() {
                   setFechaRutaSeleccionada(undefined);
                   setAsesorRutaSeleccionada(undefined);
                 }}
+                onAbrirStandQr={handleAbrirStandQrDesdeRuta}
               />
             )}
 
@@ -917,7 +926,6 @@ export function App() {
 
         const cerrarModal = () => {
           setModalQrAbierto(false);
-          setCurrentView('crm-pipeline');
         };
 
         return (
