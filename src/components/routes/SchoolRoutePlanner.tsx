@@ -42,6 +42,8 @@ interface SchoolRoutePlannerProps {
   asesorPreseleccionado?: string;
   onLimpiarEscuelaPreseleccionada?: () => void;
   onAbrirStandQr?: (schoolId: string) => void;
+  escuelasPreseleccionadasIds?: string[] | null;
+  tituloGiraPreseleccionada?: string;
 }
 
 export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
@@ -52,7 +54,9 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
   fechaPreseleccionada,
   asesorPreseleccionado,
   onLimpiarEscuelaPreseleccionada,
-  onAbrirStandQr
+  onAbrirStandQr,
+  escuelasPreseleccionadasIds,
+  tituloGiraPreseleccionada
 }) => {
   const [selectedOriginIndex, setSelectedOriginIndex] = useState<number>(0);
   const [filterState, setFilterState] = useState<string>('Estado de México');
@@ -92,51 +96,102 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
   const [guardandoEnCrm, setGuardandoEnCrm] = useState<boolean>(false);
   const [resultadoGuardado, setResultadoGuardado] = useState<ResultadoGuardadoRecorrido | null>(null);
 
-  // Escuela preseleccionada desde el CRM
+  // Escuela preseleccionada desde el CRM (para visitas individuales o cuando solo hay 1 escuela)
   const escuelaPreseleccionada = useMemo(() => {
-    if (!escuelaPreseleccionadaId) return null;
-    return schools.find((s) => s.id === escuelaPreseleccionadaId) || null;
-  }, [escuelaPreseleccionadaId, schools]);
-
-  // Efecto reactivo de precarga automática para campus agendado desde el CRM
-  useEffect(() => {
-    if (!escuelaPreseleccionadaId) return;
-
-    const escuela = schools.find((s) => s.id === escuelaPreseleccionadaId);
-    if (escuela) {
-      // a) Ajusta filterState al estado de la escuela (CDMX, Estado de México o 'Todas')
-      const estadoEscuela =
-        escuela.state === 'CDMX' || escuela.state === 'Estado de México'
-          ? escuela.state
-          : 'Todas';
-      setFilterState(estadoEscuela);
-
-      // b) Establece setSelectedSchoolIds([escuela.id]) para enfocar la ruta exclusivamente en ese destino
-      setSelectedSchoolIds([escuela.id]);
-
-      // c) Si se proporciona fechaPreseleccionada, actualiza setFechaGira(fechaPreseleccionada)
-      if (fechaPreseleccionada) {
-        setFechaGira(fechaPreseleccionada);
-      }
-
-      // d) Si se proporciona asesorPreseleccionado, actualiza setAsesorResponsable(asesorPreseleccionado)
-      if (asesorPreseleccionado) {
-        setAsesorResponsable(asesorPreseleccionado);
-      }
-
-      // e) Ejecuta resolverCircuitoOptimoTsp con el punto base de CDMX actual y la escuela seleccionada
-      const origenActual = PUNTOS_ORIGEN_CDMX[selectedOriginIndex] || PUNTOS_ORIGEN_CDMX[0];
-      const nuevoRecorrido = resolverCircuitoOptimoTsp(
-        origenActual,
-        [escuela],
-        estadoEscuela
-      );
-      setRecorridoActual(nuevoRecorrido);
-
-      // f) Limpia cualquier resultadoGuardado previo
-      setResultadoGuardado(null);
+    if (escuelaPreseleccionadaId) {
+      return schools.find((s) => s.id === escuelaPreseleccionadaId) || null;
     }
-  }, [escuelaPreseleccionadaId, schools, fechaPreseleccionada, asesorPreseleccionado, selectedOriginIndex]);
+    if (escuelasPreseleccionadasIds && escuelasPreseleccionadasIds.length === 1) {
+      return schools.find((s) => s.id === escuelasPreseleccionadasIds[0]) || null;
+    }
+    return null;
+  }, [escuelaPreseleccionadaId, escuelasPreseleccionadasIds, schools]);
+
+  // Efecto reactivo de precarga automática para gira multisede o campus individual
+  useEffect(() => {
+    // Caso 1: Gira comercial multisede (arreglo de IDs proporcionado y con elementos)
+    if (escuelasPreseleccionadasIds && escuelasPreseleccionadasIds.length > 0) {
+      const escuelasGira = schools.filter((s) => escuelasPreseleccionadasIds.includes(s.id));
+      if (escuelasGira.length > 0) {
+        // a) Establece selección de las escuelas de la gira
+        setSelectedSchoolIds(escuelasGira.map((s) => s.id));
+
+        // b) Detecta la región geográfica de la gira
+        const todasCdmx = escuelasGira.every((s) => s.state === 'CDMX');
+        const todasEdomex = escuelasGira.every((s) => s.state === 'Estado de México');
+        const regionGira = todasCdmx ? 'CDMX' : todasEdomex ? 'Estado de México' : 'Todas';
+        setFilterState(regionGira);
+
+        // c) Si se proporciona fechaPreseleccionada, actualiza setFechaGira
+        if (fechaPreseleccionada) {
+          setFechaGira(fechaPreseleccionada);
+        }
+
+        // d) Si se proporciona asesorPreseleccionado, actualiza setAsesorResponsable
+        if (asesorPreseleccionado) {
+          setAsesorResponsable(asesorPreseleccionado);
+        }
+
+        // e) Ejecuta resolverCircuitoOptimoTsp con el origen base CDMX y todas las escuelas de la gira juntas
+        const origenActual = PUNTOS_ORIGEN_CDMX[selectedOriginIndex] || PUNTOS_ORIGEN_CDMX[0];
+        const nuevoRecorrido = resolverCircuitoOptimoTsp(
+          origenActual,
+          escuelasGira,
+          regionGira
+        );
+        setRecorridoActual(nuevoRecorrido);
+
+        // f) Limpia cualquier resultadoGuardado previo
+        setResultadoGuardado(null);
+        return;
+      }
+    }
+
+    // Caso 2: Campus individual agendado
+    if (escuelaPreseleccionadaId) {
+      const escuela = schools.find((s) => s.id === escuelaPreseleccionadaId);
+      if (escuela) {
+        // a) Ajusta filterState al estado de la escuela (CDMX, Estado de México o 'Todas')
+        const estadoEscuela =
+          escuela.state === 'CDMX' || escuela.state === 'Estado de México'
+            ? escuela.state
+            : 'Todas';
+        setFilterState(estadoEscuela);
+
+        // b) Establece setSelectedSchoolIds([escuela.id]) para enfocar la ruta exclusivamente en ese destino
+        setSelectedSchoolIds([escuela.id]);
+
+        // c) Si se proporciona fechaPreseleccionada, actualiza setFechaGira(fechaPreseleccionada)
+        if (fechaPreseleccionada) {
+          setFechaGira(fechaPreseleccionada);
+        }
+
+        // d) Si se proporciona asesorPreseleccionado, actualiza setAsesorResponsable(asesorPreseleccionado)
+        if (asesorPreseleccionado) {
+          setAsesorResponsable(asesorPreseleccionado);
+        }
+
+        // e) Ejecuta resolverCircuitoOptimoTsp con el punto base de CDMX actual y la escuela seleccionada
+        const origenActual = PUNTOS_ORIGEN_CDMX[selectedOriginIndex] || PUNTOS_ORIGEN_CDMX[0];
+        const nuevoRecorrido = resolverCircuitoOptimoTsp(
+          origenActual,
+          [escuela],
+          estadoEscuela
+        );
+        setRecorridoActual(nuevoRecorrido);
+
+        // f) Limpia cualquier resultadoGuardado previo
+        setResultadoGuardado(null);
+      }
+    }
+  }, [
+    escuelasPreseleccionadasIds,
+    escuelaPreseleccionadaId,
+    schools,
+    fechaPreseleccionada,
+    asesorPreseleccionado,
+    selectedOriginIndex
+  ]);
 
   // Filtrado de lista según estado y término de búsqueda
   const filteredSchools = useMemo(() => {
@@ -239,49 +294,86 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
         </div>
       </div>
 
-      {/* BANNER VISUAL DE CAMPUS AGENDADO */}
-      {escuelaPreseleccionadaId && (
+      {/* BANNER VISUAL DE CAMPUS O GIRA AGENDADA */}
+      {((escuelasPreseleccionadasIds && escuelasPreseleccionadasIds.length > 0) || escuelaPreseleccionadaId) && (
         <div className="bg-[#0f094f]/5 border border-[#29008e]/20 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fadeIn">
-          <div className="flex items-start sm:items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#0f094f] text-white flex items-center justify-center shrink-0 shadow-sm">
-              <Navigation className="w-5 h-5 text-[#a78bfa]" />
-            </div>
-            <div>
-              <span className="text-[#29008e] font-bold uppercase tracking-wider text-[10px] block">
-                CAMPUS COMERCIAL AGENDADO PRECARGADO
-              </span>
-              <h2 className="font-bold text-sm text-[#111111]">
-                {escuelaPreseleccionada?.name || 'Campus Universitario Seleccionado'}
-              </h2>
-              <p className="text-xs text-[#555555] mt-0.5">
-                {escuelaPreseleccionada ? `${escuelaPreseleccionada.municipality}, ${escuelaPreseleccionada.state} — ` : ''}
-                Circuito cerrado y liquidación de viáticos calculados automáticamente para la visita.
-              </p>
-            </div>
-          </div>
+          {escuelasPreseleccionadasIds && escuelasPreseleccionadasIds.length > 1 ? (
+            /* CASO GIRA MULTISEDE */
+            <>
+              <div className="flex items-start sm:items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#0f094f] text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <Navigation className="w-5 h-5 text-[#a78bfa]" />
+                </div>
+                <div>
+                  <span className="text-[#29008e] font-bold uppercase tracking-wider text-[10px] block">
+                    GIRA COMERCIAL MULTISEDE AGENDADA
+                  </span>
+                  <h2 className="font-bold text-sm text-[#111111]">
+                    {tituloGiraPreseleccionada || `${escuelasPreseleccionadasIds.length} Campus Universitarios Agendados`}
+                  </h2>
+                  <p className="text-xs text-[#555555] mt-0.5">
+                    Circuito cerrado optimizado mediante algoritmo 2-Opt TSP con paradas coordinadas y viáticos unificados para la jornada.
+                  </p>
+                </div>
+              </div>
 
-          <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
-            {onAbrirStandQr && escuelaPreseleccionada && (
-              <button
-                type="button"
-                onClick={() => onAbrirStandQr(escuelaPreseleccionada.id)}
-                className="px-3.5 py-2 text-xs font-bold text-white bg-gradient-to-r from-[#640354] to-[#29008e] hover:brightness-110 rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
-                title="Abrir formulario o stand de registro QR para estudiantes"
-              >
-                <QrCode className="w-3.5 h-3.5" />
-                <span>Abrir Stand QR</span>
-              </button>
-            )}
-            {onLimpiarEscuelaPreseleccionada && (
-              <button
-                type="button"
-                onClick={onLimpiarEscuelaPreseleccionada}
-                className="px-3.5 py-2 text-xs font-bold text-[#0f094f] bg-white border border-[#29008e]/20 rounded-xl hover:bg-[#0f094f]/5 transition-colors cursor-pointer"
-              >
-                Ver todas las sedes
-              </button>
-            )}
-          </div>
+              {onLimpiarEscuelaPreseleccionada && (
+                <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={onLimpiarEscuelaPreseleccionada}
+                    className="px-3.5 py-2 text-xs font-bold text-[#0f094f] bg-white border border-[#29008e]/20 rounded-xl hover:bg-[#0f094f]/5 transition-colors cursor-pointer"
+                  >
+                    Ver todas las sedes
+                  </button>
+                </div>
+              )}
+            </>
+          ) : (
+            /* CASO CAMPUS INDIVIDUAL */
+            <>
+              <div className="flex items-start sm:items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#0f094f] text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <Navigation className="w-5 h-5 text-[#a78bfa]" />
+                </div>
+                <div>
+                  <span className="text-[#29008e] font-bold uppercase tracking-wider text-[10px] block">
+                    CAMPUS COMERCIAL AGENDADO PRECARGADO
+                  </span>
+                  <h2 className="font-bold text-sm text-[#111111]">
+                    {escuelaPreseleccionada?.name || 'Campus Universitario Seleccionado'}
+                  </h2>
+                  <p className="text-xs text-[#555555] mt-0.5">
+                    {escuelaPreseleccionada ? `${escuelaPreseleccionada.municipality}, ${escuelaPreseleccionada.state} — ` : ''}
+                    Circuito cerrado y liquidación de viáticos calculados automáticamente para la visita.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
+                {onAbrirStandQr && escuelaPreseleccionada && (
+                  <button
+                    type="button"
+                    onClick={() => onAbrirStandQr(escuelaPreseleccionada.id)}
+                    className="px-3.5 py-2 text-xs font-bold text-white bg-gradient-to-r from-[#640354] to-[#29008e] hover:brightness-110 rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                    title="Abrir formulario o stand de registro QR para estudiantes"
+                  >
+                    <QrCode className="w-3.5 h-3.5" />
+                    <span>Abrir Stand QR</span>
+                  </button>
+                )}
+                {onLimpiarEscuelaPreseleccionada && (
+                  <button
+                    type="button"
+                    onClick={onLimpiarEscuelaPreseleccionada}
+                    className="px-3.5 py-2 text-xs font-bold text-[#0f094f] bg-white border border-[#29008e]/20 rounded-xl hover:bg-[#0f094f]/5 transition-colors cursor-pointer"
+                  >
+                    Ver todas las sedes
+                  </button>
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
 
