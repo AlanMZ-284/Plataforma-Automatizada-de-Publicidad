@@ -95,6 +95,9 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
   const [alumnosDeal, setAlumnosDeal] = useState<ProspectoAlumno[]>([]);
   const [cargandoAlumnosDeal, setCargandoAlumnosDeal] = useState(false);
 
+  // Estado para el Modal de Expediente Completo de la Oportunidad
+  const [dealDetalleSeleccionado, setDealDetalleSeleccionado] = useState<Deal | null>(null);
+
   // Función para abrir modal y consultar alumnos del evento
   const abrirModalAlumnosDeal = async (deal: Deal) => {
     setDealAlumnosSeleccionado(deal);
@@ -551,14 +554,18 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                   return (
                     <div
                       key={deal.id}
-                      className="card-light card-light-hover p-4 text-left group rounded-[18px] flex flex-col justify-between h-[395px]"
+                      onClick={() => setDealDetalleSeleccionado(deal)}
+                      className="card-light card-light-hover p-4 text-left group rounded-[18px] flex flex-col justify-between h-[395px] cursor-pointer"
                     >
                       {/* Contenido Superior de la Tarjeta */}
                       <div className="space-y-2">
                         {/* Encabezado institucional: Universidad con tooltip/truncate + Lead Score */}
                         <div className="flex items-start justify-between gap-1">
                           <span
-                            onClick={() => onSelectSchoolForCRM && onSelectSchoolForCRM(deal.companyId)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onSelectSchoolForCRM) onSelectSchoolForCRM(deal.companyId);
+                            }}
                             className="text-[11px] font-bold text-[#0f094f] hover:text-[#29008e] hover:underline cursor-pointer truncate"
                             title={company?.name}
                           >
@@ -657,9 +664,10 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                           {currentIdx > 0 ? (
                             <button
                               type="button"
-                              onClick={() =>
-                                handleStageChange(deal.id, deal.stage, STAGES_CONFIG[currentIdx - 1].stage)
-                              }
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleStageChange(deal.id, deal.stage, STAGES_CONFIG[currentIdx - 1].stage);
+                              }}
                               title="Regresar etapa anterior"
                               className="p-1 hover:bg-black/5 rounded-lg text-[#888888] hover:text-[#111111] transition-colors"
                             >
@@ -673,7 +681,10 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                             {deal.stage !== 'resultado' && (
                               <button
                                 type="button"
-                                onClick={() => handleStageChange(deal.id, deal.stage, 'resultado')}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStageChange(deal.id, deal.stage, 'resultado');
+                                }}
                                 title="Marcar como Éxito / Ganado"
                                 className="px-2 py-0.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors"
                               >
@@ -684,9 +695,10 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                             {currentIdx < STAGES_CONFIG.length - 1 && (
                               <button
                                 type="button"
-                                onClick={() =>
-                                  handleStageChange(deal.id, deal.stage, STAGES_CONFIG[currentIdx + 1].stage)
-                                }
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStageChange(deal.id, deal.stage, STAGES_CONFIG[currentIdx + 1].stage);
+                                }}
                                 title="Avanzar siguiente etapa"
                                 className="p-1 bg-[#0f094f] hover:bg-[#29008e] text-white rounded-lg transition-all shadow-xs"
                               >
@@ -700,7 +712,10 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                         {onOpenEventKit && (
                           <button
                             type="button"
-                            onClick={() => onOpenEventKit(deal.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenEventKit(deal.id);
+                            }}
                             className="w-full py-1 px-2 bg-[#0f094f]/5 hover:bg-[#0f094f]/10 text-[#0f094f] rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all border border-[#0f094f]/10 group-hover:border-[#0f094f]/20"
                           >
                             <Sparkles className="w-3.5 h-3.5 text-[#29008e]" />
@@ -712,7 +727,10 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                         {onTrazarRuta && deal.stage === 'agendado' && (
                           <button
                             type="button"
-                            onClick={() => onTrazarRuta(deal.companyId, deal.expectedCloseDate, deal.assignedRep)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onTrazarRuta(deal.companyId, deal.expectedCloseDate, deal.assignedRep);
+                            }}
                             className="w-full py-1.5 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all bg-gradient-to-r from-[#29008e] to-[#640354] hover:brightness-110 text-white shadow-xs"
                             title="Calcular circuito logístico, viáticos y navegación GPS para este campus agendado"
                           >
@@ -724,7 +742,10 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                         {/* Botón directo de Captura y Consulta de Alumnos QR */}
                         <button
                           type="button"
-                          onClick={() => abrirModalAlumnosDeal(deal)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            abrirModalAlumnosDeal(deal);
+                          }}
                           className="w-full py-1 px-2 bg-[#640354]/10 hover:bg-[#640354]/15 text-[#640354] rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all border border-[#640354]/20 group-hover:border-[#640354]/30"
                         >
                           <QrCode className="w-3.5 h-3.5 text-[#640354]" />
@@ -1078,6 +1099,228 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
           </div>
         </div>
       )}
+
+      {/* MODAL DE EXPEDIENTE COMPLETO DE OPORTUNIDAD COMERCIAL */}
+      {dealDetalleSeleccionado && (() => {
+        const dealActual = deals.find((d) => d.id === dealDetalleSeleccionado.id) || dealDetalleSeleccionado;
+        const empresaAsociada = companyMap.get(dealActual.companyId);
+        const configEtapa = STAGES_CONFIG.find((s) => s.stage === dealActual.stage) || STAGES_CONFIG[0];
+        const pronosticoForecast = Math.round((dealActual.amount * dealActual.probability) / 100);
+
+        return (
+          <div className="fixed inset-0 z-50 bg-[#07052e]/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-fadeIn">
+            {/* Backdrop interactivo para cerrar al hacer clic afuera */}
+            <div
+              className="fixed inset-0 cursor-pointer"
+              onClick={() => setDealDetalleSeleccionado(null)}
+            />
+
+            {/* Tarjeta Central del Modal */}
+            <div className="relative z-10 bg-white rounded-[28px] max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-develop-modal border border-black/10 animate-scaleUp">
+              {/* Cabecera Dark Premium */}
+              <div className="premium-dark-surface p-5 sm:p-6 text-white border-b border-white/10 relative shrink-0">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1.5 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-[#a78bfa]">
+                        CRM · EXPEDIENTE DE OPORTUNIDAD COMERCIAL
+                      </span>
+                      <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${configEtapa.badge}`}>
+                        {configEtapa.label}
+                      </span>
+                    </div>
+                    <h3 className="text-lg sm:text-xl font-bold text-white mt-1 leading-snug break-words">
+                      {dealActual.title}
+                    </h3>
+                    <p className="text-xs sm:text-sm text-white/70">
+                      {empresaAsociada?.name || 'Universidad Aliada'} {empresaAsociada?.state ? `· ${empresaAsociada.state}` : ''}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setDealDetalleSeleccionado(null)}
+                    className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+                    title="Cerrar expediente"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Cuerpo con Scroll */}
+              <div className="p-5 sm:p-6 space-y-5 overflow-y-auto bg-white flex-1">
+                {/* Cuadrícula de Métricas Financieras (4 columnas en grid) */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="card-light p-3.5 rounded-2xl border border-black/5 space-y-0.5">
+                    <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">
+                      Presupuesto Total
+                    </span>
+                    <div className="text-sm sm:text-base font-extrabold text-[#111111] truncate">
+                      ${dealActual.amount.toLocaleString('es-MX')} MXN
+                    </div>
+                  </div>
+
+                  <div className="card-light p-3.5 rounded-2xl border border-black/5 space-y-0.5">
+                    <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">
+                      Probabilidad
+                    </span>
+                    <div className="text-sm sm:text-base font-extrabold text-[#29008e]">
+                      {dealActual.probability}%
+                    </div>
+                  </div>
+
+                  <div className="card-light p-3.5 rounded-2xl border border-black/5 space-y-0.5">
+                    <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block" title="Valor esperado para flujo de caja">
+                      Pronóstico Ponderado
+                    </span>
+                    <div className="text-sm sm:text-base font-extrabold text-emerald-700 truncate">
+                      ${pronosticoForecast.toLocaleString('es-MX')} MXN
+                    </div>
+                    <span className="text-[9px] text-[#888888] block">Valor esperado para flujo de caja</span>
+                  </div>
+
+                  <div className="card-light p-3.5 rounded-2xl border border-black/5 space-y-0.5">
+                    <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">
+                      Talento Capturado
+                    </span>
+                    <div className="text-sm sm:text-base font-extrabold text-[#640354]">
+                      {dealActual.registeredLeadsCount || 0} alumnos
+                    </div>
+                  </div>
+                </div>
+
+                {/* Detalles de Clasificación (grid 2 columnas) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 bg-[#F8F8FC] rounded-2xl border border-black/5 space-y-1">
+                    <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">Modalidad</span>
+                    <div className="font-bold text-[#111111] flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-[#29008e]" />
+                      <span>
+                        {dealActual.projectModality === 'modalidad_a_programa'
+                          ? 'Modalidad A (Programa Develop)'
+                          : 'Modalidad B (Alojado Escuela)'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-[#F8F8FC] rounded-2xl border border-black/5 space-y-1">
+                    <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">Tipo de Evento</span>
+                    <div className="font-bold text-[#111111] flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-[#640354]" />
+                      <span className="capitalize">{dealActual.eventType.replace('_', ' ')}</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-[#F8F8FC] rounded-2xl border border-black/5 space-y-1">
+                    <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">Asesor Responsable</span>
+                    <div className="font-bold text-[#111111] flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-[#888888]" />
+                      <span>{dealActual.assignedRep}</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-[#F8F8FC] rounded-2xl border border-black/5 space-y-1">
+                    <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">Fecha Programada / Cierre</span>
+                    <div className="font-bold text-[#111111] flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-[#888888]" />
+                      <span>{dealActual.expectedCloseDate || 'Sin fecha programada'}</span>
+                    </div>
+                  </div>
+
+                  <div className="sm:col-span-2 p-3 bg-[#F8F8FC] rounded-2xl border border-black/5 space-y-1">
+                    <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">Marcas Patrocinadoras</span>
+                    <div className="font-medium text-[#111111] flex items-center gap-1.5">
+                      <Flag className="w-3.5 h-3.5 text-[#29008e]" />
+                      <span>
+                        {dealActual.alliedBrands && dealActual.alliedBrands.length > 0
+                          ? dealActual.alliedBrands.join(', ')
+                          : 'Sin patrocinadores asignados'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notas Completas de la Negociación */}
+                <div className="bg-[#F8F8FC] p-4 rounded-2xl border border-black/5 space-y-1.5">
+                  <span className="text-[11px] font-bold text-[#888888] uppercase tracking-wider block">
+                    Notas & Acuerdos de la Negociación
+                  </span>
+                  <p className="text-xs sm:text-sm text-[#222222] leading-relaxed whitespace-pre-wrap">
+                    {dealActual.notes || 'Sin notas registradas para esta oportunidad.'}
+                  </p>
+                </div>
+
+                {/* Selector de Etapa Rápida */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-[#111111] uppercase tracking-wider block">
+                    Cambiar Etapa de la Oportunidad
+                  </label>
+                  <select
+                    value={dealActual.stage}
+                    onChange={(e) => {
+                      const nuevaEtapa = e.target.value as PipelineStage;
+                      handleStageChange(dealActual.id, dealActual.stage, nuevaEtapa);
+                      setDealDetalleSeleccionado((prev) => (prev ? { ...prev, stage: nuevaEtapa } : null));
+                    }}
+                    className="input-develop w-full text-xs font-bold text-[#0f094f]"
+                  >
+                    {STAGES_CONFIG.map((s) => (
+                      <option key={s.stage} value={s.stage}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Pie de Acciones */}
+              <div className="p-4 sm:p-5 bg-[#F8F8FC] border-t border-black/5 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  {dealActual.stage === 'agendado' && onTrazarRuta && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onTrazarRuta(
+                          dealActual.companyId,
+                          dealActual.expectedCloseDate,
+                          dealActual.assignedRep
+                        );
+                        setDealDetalleSeleccionado(null);
+                      }}
+                      className="px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all bg-gradient-to-r from-[#29008e] to-[#640354] hover:brightness-110 text-white shadow-xs cursor-pointer"
+                      title="Calcular circuito logístico y viáticos"
+                    >
+                      <Navigation className="w-3.5 h-3.5 text-white" />
+                      <span>Planificar Ruta de Visita</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      abrirModalAlumnosDeal(dealActual);
+                      setDealDetalleSeleccionado(null);
+                    }}
+                    className="px-3.5 py-2 bg-[#640354]/10 hover:bg-[#640354]/15 text-[#640354] rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border border-[#640354]/20 cursor-pointer"
+                  >
+                    <QrCode className="w-3.5 h-3.5 text-[#640354]" />
+                    <span>Talento QR Alumnos ({dealActual.registeredLeadsCount || 0})</span>
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setDealDetalleSeleccionado(null)}
+                  className="btn-secondary-develop px-4 py-2 text-xs font-bold cursor-pointer"
+                >
+                  Cerrar Expediente
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };
