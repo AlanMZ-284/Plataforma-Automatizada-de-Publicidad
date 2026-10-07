@@ -302,6 +302,13 @@ export function App() {
     });
   };
 
+  // Actualizar detalles y notas de un trato / oportunidad
+  const handleUpdateDealDetails = (dealId: string, updates: Partial<Deal>) => {
+    setDeals((prev) =>
+      prev.map((deal) => (deal.id === dealId ? { ...deal, ...updates } : deal))
+    );
+  };
+
   // Agregar actividad al timeline de una escuela
   const handleAddActivity = (activityData: Omit<Activity, 'id'>) => {
     const newActivity: Activity = {
@@ -309,6 +316,12 @@ export function App() {
       id: `act-${Date.now()}`
     };
     setActivities((prev) => [newActivity, ...prev]);
+  };
+
+  const handleToggleActivity = (activityId: string) => {
+    setActivities((prev) =>
+      prev.map((act) => (act.id === activityId ? { ...act, completed: !act.completed } : act))
+    );
   };
 
   // Importar instituciones educativas desde Excel o CSV a la cartera activa
@@ -763,6 +776,7 @@ export function App() {
                 companies={companies}
                 onUpdateDealStage={handleUpdateDealStage}
                 onAddDeal={handleAddDeal}
+                onUpdateDealDetails={handleUpdateDealDetails}
                 onSelectSchoolForCRM={handleOpenSchoolInCRM}
                 onOpenEventKit={handleOpenEventKit}
                 onAddActivity={handleAddActivity}
@@ -784,6 +798,7 @@ export function App() {
                 deals={deals}
                 activities={activities}
                 onAddActivity={handleAddActivity}
+                onToggleActivity={handleToggleActivity}
                 onNavigateToRoutePlanner={() => handleTrazarRutaParaEscuela(selectedSchoolDetailId || '')}
                 selectedCompanyId={selectedSchoolDetailId}
                 onCloseCompanyDetail={() => setSelectedSchoolDetailId(null)}

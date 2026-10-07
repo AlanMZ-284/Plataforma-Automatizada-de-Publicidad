@@ -6,7 +6,11 @@ import {
   PUNTOS_ORIGEN_CDMX,
   RecorridoOptimizado
 } from '../../utils/optimizadorRutas';
-import { guardarRecorridoRuta, ResultadoGuardadoRecorrido } from '../../services/servicioCrm';
+import { 
+  guardarRecorridoRuta, 
+  ResultadoGuardadoRecorrido,
+  obtenerRecorridosGuardados 
+} from '../../services/servicioCrm';
 import { RouteMap } from './RouteMap';
 import { 
   Navigation, 
@@ -30,7 +34,9 @@ import {
   Search,
   FileSpreadsheet,
   FlagTriangleRight,
-  QrCode
+  QrCode,
+  History,
+  RotateCcw
 } from 'lucide-react';
 
 interface SchoolRoutePlannerProps {
@@ -95,6 +101,50 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
   const [isCalculating, setIsCalculating] = useState<boolean>(false);
   const [guardandoEnCrm, setGuardandoEnCrm] = useState<boolean>(false);
   const [resultadoGuardado, setResultadoGuardado] = useState<ResultadoGuardadoRecorrido | null>(null);
+
+  // Historial de Giras Comerciales Agendadas en el CRM
+  const [girasGuardadas, setGirasGuardadas] = useState<any[]>([]);
+  const [cargandoGirasGuardadas, setCargandoGirasGuardadas] = useState<boolean>(false);
+
+  const cargarGirasGuardadas = async () => {
+    setCargandoGirasGuardadas(true);
+    try {
+      const recorridos = await obtenerRecorridosGuardados();
+      setGirasGuardadas(recorridos || []);
+    } catch (e) {
+      console.warn('Error cargando giras agendadas previas:', e);
+    } finally {
+      setCargandoGirasGuardadas(false);
+    }
+  };
+
+  useEffect(() => {
+    cargarGirasGuardadas();
+  }, []);
+
+  const handleRecargarGira = (gira: any) => {
+    const paradas: any[] = gira.paradas || gira.datos_adicionales?.paradas || [];
+    const idsEscuelas = paradas
+      .map((p: any) => p.universidad_id || p.schoolId)
+      .filter(Boolean);
+
+    if (idsEscuelas.length > 0) {
+      setSelectedSchoolIds(idsEscuelas);
+      const escuelasObjetivo = schools.filter((s) => idsEscuelas.includes(s.id));
+      if (escuelasObjetivo.length > 0) {
+        const origenActual = PUNTOS_ORIGEN_CDMX[selectedOriginIndex] || PUNTOS_ORIGEN_CDMX[0];
+        const nuevo = resolverCircuitoOptimoTsp(origenActual, escuelasObjetivo, filterState);
+        setRecorridoActual(nuevo);
+        if (gira.fecha_gira || gira.fecha_inicio) {
+          setFechaGira(gira.fecha_gira || gira.fecha_inicio);
+        }
+        if (gira.asesor_responsable) {
+          setAsesorResponsable(gira.asesor_responsable);
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+  };
 
   // Escuela preseleccionada desde el CRM (para visitas individuales o cuando solo hay 1 escuela)
   const escuelaPreseleccionada = useMemo(() => {
@@ -244,7 +294,10 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
       const resultado = await guardarRecorridoRuta(recorridoActual, fechaGira, asesorResponsable);
       setResultadoGuardado(resultado);
 
-      // 2. Notificar al manejador de la aplicación principal para reactividad instantánea
+      // 2. Refrescar lista de giras agendadas en la interfaz
+      await cargarGirasGuardadas();
+
+      // 3. Notificar al manejador de la aplicación principal para reactividad instantánea
       if (onLogRouteToCRM) {
         onLogRouteToCRM(recorridoActual, fechaGira, asesorResponsable);
       }
@@ -498,14 +551,14 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
 
           {/* Búsqueda rápida de universidades */}
           <div className="space-y-1.5">
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#888888]" />
+            <div className="relative flex items-center">
+              <Search className="w-3.5 h-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#888888] pointer-events-none" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Buscar campus o municipio..."
-                className="input-develop w-full pl-8 text-xs text-[#111111]"
+                className="input-develop w-full pl-10 pr-4 text-xs text-[#111111]"
               />
             </div>
           </div>
@@ -917,6 +970,156 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
           </div>
         </div>
       )}
+
+      {/* SECCIÓN: HISTORIAL DE GIRAS COMERCIALES AGENDADAS EN EL CRM */}
+      <div className="card-light p-5 sm:p-7 rounded-[24px] space-y-5 border border-black/5 animate-fadeIn">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-black/5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#0f094f]/5 text-[#0f094f] flex items-center justify-center font-bold shrink-0">
+              <History className="w-5 h-5 text-[#29008e]" />
+            </div>
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-[#a78bfa]">
+                Develop Logistics · Control Operativo
+              </div>
+              <h3 className="text-base sm:text-lg font-bold text-[#111111]">
+                Giras Comerciales Programadas ({girasGuardadas.length})
+              </h3>
+              <p className="text-xs text-[#555555]">
+                Historial de circuitos de visita agendados en el CRM con itinerario, viáticos autorizados y enlace de navegación.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={cargarGirasGuardadas}
+            disabled={cargandoGirasGuardadas}
+            className="btn-secondary-light text-xs px-3.5 py-1.5 rounded-xl font-bold flex items-center gap-1.5 self-start sm:self-auto shrink-0 shadow-xs cursor-pointer"
+            title="Refrescar lista de giras agendadas"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-[#29008e] ${cargandoGirasGuardadas ? 'animate-spin' : ''}`} />
+            <span>Actualizar</span>
+          </button>
+        </div>
+
+        {cargandoGirasGuardadas ? (
+          <div className="py-8 text-center text-xs text-[#888888]">
+            Consultando giras agendadas en la base de datos...
+          </div>
+        ) : girasGuardadas.length === 0 ? (
+          <div className="card-light p-6 text-center rounded-2xl border border-black/5 space-y-2">
+            <Calendar className="w-8 h-8 text-[#888888] mx-auto opacity-50" />
+            <div className="font-bold text-xs text-[#111111]">Aún no hay giras guardadas en la agenda</div>
+            <p className="text-xs text-[#666666] max-w-md mx-auto">
+              Selecciona sedes universitarias arriba, pulsa <strong className="text-[#0f094f]">«Calcular Circuito Óptimo TSP»</strong> y posteriormente <strong className="text-[#0f094f]">«Guardar en Agenda CRM»</strong> para registrar tu primer circuito de visitas.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {girasGuardadas.map((gira, index) => {
+              const fechaTexto = gira.fecha_gira || gira.fecha_inicio || (gira.creado_en ? gira.creado_en.split('T')[0] : 'Fecha no especificada');
+              const paradas: any[] = gira.paradas || gira.datos_adicionales?.paradas || [];
+              const viaticosTotal = gira.total_viaticos_mxn || gira.viaticos?.total_viaticos_mxn || 0;
+              const ganancia = gira.porcentaje_ganancia_eficiencia || 0;
+              const km = gira.distancia_total_km || 0;
+              const linkMaps = gira.enlace_google_maps || '';
+              const asesor = gira.asesor_responsable || 'Carlos Mendoza';
+              const tituloGira = gira.titulo || `Gira Multisede (${paradas.length} paradas)`;
+
+              return (
+                <div
+                  key={gira.id || index}
+                  className="card-light card-light-hover p-4 sm:p-5 rounded-2xl border border-black/5 flex flex-col justify-between space-y-3.5"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider bg-[#0f094f]/10 text-[#0f094f]">
+                        {fechaTexto}
+                      </span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        Agendada en CRM
+                      </span>
+                    </div>
+
+                    <h4 className="font-bold text-sm text-[#111111] leading-snug">
+                      {tituloGira}
+                    </h4>
+
+                    <div className="text-xs text-[#555555] flex items-center gap-1.5 flex-wrap">
+                      <span className="font-semibold text-[#888888]">Asesor:</span>
+                      <span>{asesor}</span>
+                      <span className="text-[#cccccc]">·</span>
+                      <span className="font-semibold text-[#888888]">Paradas:</span>
+                      <span>{paradas.length} sedes</span>
+                    </div>
+
+                    {/* Chips de sedes incluidas */}
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {paradas.slice(0, 4).map((p: any, pIdx: number) => (
+                        <span
+                          key={pIdx}
+                          className="text-[10px] px-2 py-0.5 bg-black/5 text-[#444444] rounded-md font-medium truncate max-w-[180px]"
+                          title={p.nombre || p.name}
+                        >
+                          {p.orden ? `${p.orden}. ` : ''}{p.nombre || p.name || 'Campus'}
+                        </span>
+                      ))}
+                      {paradas.length > 4 && (
+                        <span className="text-[10px] px-1.5 py-0.5 text-[#888888] font-bold">
+                          +{paradas.length - 4} más
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Métricas compactas */}
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-black/5 text-center">
+                      <div className="p-1.5 bg-[#F8F8FC] rounded-xl">
+                        <div className="text-[9px] font-bold text-[#888888] uppercase">Distancia</div>
+                        <div className="text-xs font-bold text-[#111111]">{km} km</div>
+                      </div>
+                      <div className="p-1.5 bg-[#F8F8FC] rounded-xl">
+                        <div className="text-[9px] font-bold text-[#888888] uppercase">Viáticos</div>
+                        <div className="text-xs font-bold text-[#29008e]">${Number(viaticosTotal).toLocaleString('es-MX')}</div>
+                      </div>
+                      <div className="p-1.5 bg-[#F8F8FC] rounded-xl">
+                        <div className="text-[9px] font-bold text-[#888888] uppercase">Eficiencia</div>
+                        <div className="text-xs font-bold text-emerald-700">+{ganancia}%</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Acciones de la gira */}
+                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-black/5">
+                    <button
+                      type="button"
+                      onClick={() => handleRecargarGira(gira)}
+                      className="px-3 py-1.5 rounded-xl bg-[#0f094f]/5 hover:bg-[#0f094f]/10 text-[#0f094f] text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                      title="Cargar esta gira en el mapa interactivo TSP"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 text-[#29008e]" />
+                      <span>Recargar Circuito</span>
+                    </button>
+
+                    {linkMaps && (
+                      <a
+                        href={linkMaps}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#29008e] to-[#640354] hover:brightness-110 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs"
+                        title="Abrir recorrido completo en Google Maps"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 text-white" />
+                        <span>Ver en Maps</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

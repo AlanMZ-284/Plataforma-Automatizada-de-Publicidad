@@ -46,6 +46,7 @@ interface CompaniesListProps {
   deals: Deal[];
   activities: Activity[];
   onAddActivity: (activity: Omit<Activity, 'id'>) => void;
+  onToggleActivity?: (activityId: string) => void;
   onNavigateToRoutePlanner?: () => void;
   selectedCompanyId?: string | null;
   onCloseCompanyDetail?: () => void;
@@ -61,6 +62,7 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
   deals,
   activities,
   onAddActivity,
+  onToggleActivity,
   onNavigateToRoutePlanner,
   selectedCompanyId,
   onCloseCompanyDetail,
@@ -131,6 +133,9 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
   const [activityType, setActivityType] = useState<'call' | 'meeting' | 'email' | 'note' | 'task'>('call');
   const [activityTitle, setActivityTitle] = useState('');
   const [activityDesc, setActivityDesc] = useState('');
+  const [activityMode, setActivityMode] = useState<'minuta' | 'compromiso'>('minuta');
+  const [activityDate, setActivityDate] = useState<string>(() => new Date().toISOString().substring(0, 10));
+  const [filtroTimeline, setFiltroTimeline] = useState<'todas' | 'pendientes' | 'completadas'>('todas');
 
   // Sincronizar prop externa con estado local
   React.useEffect(() => {
@@ -290,6 +295,13 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
   const companyContacts = contactosLocales.filter((ct) => ct.companyId === activeModalCompanyId);
   const companyDeals = deals.filter((d) => d.companyId === activeModalCompanyId);
   const companyActivities = activities.filter((a) => a.companyId === activeModalCompanyId);
+  const pendientesCount = companyActivities.filter((a) => !a.completed).length;
+  const completadasCount = companyActivities.filter((a) => a.completed).length;
+  const actividadesFiltradas = companyActivities.filter((a) => {
+    if (filtroTimeline === 'pendientes') return !a.completed;
+    if (filtroTimeline === 'completadas') return a.completed;
+    return true;
+  });
 
   // Registro manual de una nueva institución educativa en Supabase
   const manejarCrearUniversidadManual = async (e: React.FormEvent) => {
@@ -394,18 +406,21 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
     e.preventDefault();
     if (!activeModalCompanyId || !activityTitle.trim()) return;
 
+    const esCompromisoFuturo = activityMode === 'compromiso';
+
     onAddActivity({
       companyId: activeModalCompanyId,
       type: activityType,
-      title: activityTitle,
-      description: activityDesc,
-      date: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      completed: true,
+      title: activityTitle.trim(),
+      description: activityDesc.trim(),
+      date: activityDate || new Date().toISOString().substring(0, 10),
+      completed: !esCompromisoFuturo,
       author: 'Carlos Mendoza'
     });
 
     setActivityTitle('');
     setActivityDesc('');
+    setActivityDate(new Date().toISOString().substring(0, 10));
   };
 
   const closeModal = () => {
@@ -416,7 +431,7 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
   return (
     <div className="space-y-7">
       {/* HEADER EDITORIAL DEL DIRECTORIO */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2 border-b border-black/5">
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 pb-2 border-b border-black/5">
         <div>
           <div className="text-[11px] font-bold text-[#29008e] uppercase tracking-[0.22em] flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-[#a78bfa]"></span>
@@ -430,16 +445,16 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <div className="text-xs text-[#888888] font-medium">
-            Total: <strong className="text-[#0f094f] font-bold">{companiasLocales.length} instituciones</strong> en red
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <div className="text-xs px-3 py-1.5 bg-[#0f094f]/5 rounded-xl border border-[#0f094f]/10 text-[#555555] font-medium shrink-0">
+            Total: <strong className="text-[#0f094f] font-bold">{companiasLocales.length}</strong> instituciones en red
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={() => setModalRegistroManualAbierto(true)}
-              className="btn-secondary-light text-xs px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 border border-black/10 hover:border-[#29008e]/30 transition-all shadow-xs"
+              className="btn-secondary-light text-xs px-3.5 py-2 rounded-xl font-bold flex items-center gap-1.5 border border-black/10 hover:border-[#29008e]/30 transition-all shadow-xs shrink-0"
             >
               <Plus className="w-4 h-4 text-[#29008e]" />
               <span>Nueva Universidad</span>
@@ -448,7 +463,7 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
             <button
               type="button"
               onClick={() => setModalImportarAbierto(true)}
-              className="btn-primary-develop text-xs px-3.5 py-2 rounded-xl font-bold flex items-center gap-2 shadow-develop-glow transition-all"
+              className="btn-primary-develop text-xs px-3.5 py-2 rounded-xl font-bold flex items-center gap-2 shadow-develop-glow transition-all shrink-0"
             >
               <FileSpreadsheet className="w-4 h-4 text-[#a78bfa]" />
               <span>Importar Excel / CSV</span>
@@ -475,8 +490,8 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
 
       {/* CONTROLES DE FILTROS DEVELOP */}
       <div className="card-light p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="relative flex-1 w-full max-w-md">
-          <Search className="w-4 h-4 text-[#888888] absolute left-3.5 top-3.5" />
+        <div className="relative flex items-center flex-1 w-full max-w-md">
+          <Search className="w-4 h-4 text-[#888888] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
             placeholder="Buscar por universidad, municipio o rector..."
@@ -1025,57 +1040,158 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
                 {pestanaExpediente === 'actividades' && (
                   <div className="space-y-6">
                     {/* Formulario Rápido de Registro de Interacción */}
-                    <div className="card-light p-5 space-y-3.5 rounded-2xl">
+                    <div className="card-light p-5 space-y-4 rounded-2xl">
+                      {/* Selector de Modo Temporal */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-1 bg-black/5 rounded-xl">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActivityMode('minuta');
+                            if (activityType === 'task') setActivityType('call');
+                          }}
+                          className={`py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                            activityMode === 'minuta'
+                              ? 'bg-white text-[#0f094f] shadow-xs border border-black/5'
+                              : 'text-[#666666] hover:text-[#111111]'
+                          }`}
+                        >
+                          <CheckCircle2 className={`w-4 h-4 ${activityMode === 'minuta' ? 'text-emerald-600' : 'text-[#888888]'}`} />
+                          <span>Minuta Histórica (Lo que ya ocurrió)</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActivityMode('compromiso');
+                            if (activityType === 'email' || activityType === 'note') setActivityType('meeting');
+                          }}
+                          className={`py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                            activityMode === 'compromiso'
+                              ? 'bg-white text-[#640354] shadow-xs border border-black/5'
+                              : 'text-[#666666] hover:text-[#111111]'
+                          }`}
+                        >
+                          <Clock className={`w-4 h-4 ${activityMode === 'compromiso' ? 'text-amber-500' : 'text-[#888888]'}`} />
+                          <span>Compromiso / Cita Futura (Pendiente)</span>
+                        </button>
+                      </div>
+
+                      {/* Selector de Tipo de Actividad adaptativo */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <span className="text-xs font-bold text-[#111111] flex items-center gap-1.5">
                           <Plus className="w-4 h-4 text-[#29008e]" />
-                          Registrar Nueva Interacción con la Universidad
+                          {activityMode === 'minuta' ? 'Registrar Minuta Institucional' : 'Programar Compromiso o Cita'}
                         </span>
                         <div className="flex items-center gap-1 overflow-x-auto">
-                          {(['call', 'meeting', 'email', 'note', 'task'] as const).map((t) => (
-                            <button
-                              key={t}
-                              onClick={() => setActivityType(t)}
-                              className={`text-xs px-3 py-1 rounded-lg font-semibold capitalize shrink-0 whitespace-nowrap transition-all ${
-                                activityType === t
-                                  ? 'btn-primary-develop shadow-xs'
-                                  : 'bg-black/5 text-[#555555] hover:bg-black/10'
-                              }`}
-                            >
-                              {t === 'call' ? 'Llamada' : t === 'meeting' ? 'Reunión' : t === 'email' ? 'Email' : t === 'note' ? 'Nota' : 'Tarea'}
-                            </button>
-                          ))}
+                          {activityMode === 'minuta' ? (
+                            ([
+                              { id: 'call', label: 'Llamada' },
+                              { id: 'meeting', label: 'Reunión' },
+                              { id: 'email', label: 'Email' },
+                              { id: 'note', label: 'Nota' }
+                            ] as const).map(({ id, label }) => (
+                              <button
+                                key={id}
+                                type="button"
+                                onClick={() => setActivityType(id)}
+                                className={`text-xs px-3 py-1 rounded-lg font-semibold shrink-0 whitespace-nowrap transition-all cursor-pointer ${
+                                  activityType === id
+                                    ? 'btn-primary-develop shadow-xs'
+                                    : 'bg-black/5 text-[#555555] hover:bg-black/10'
+                                }`}
+                              >
+                                {label}
+                              </button>
+                            ))
+                          ) : (
+                            ([
+                              { id: 'call', label: 'Llamada Programada' },
+                              { id: 'meeting', label: 'Cita Presencial' },
+                              { id: 'task', label: 'Tarea de Seguimiento' }
+                            ] as const).map(({ id, label }) => (
+                              <button
+                                key={id}
+                                type="button"
+                                onClick={() => setActivityType(id)}
+                                className={`text-xs px-3 py-1 rounded-lg font-semibold shrink-0 whitespace-nowrap transition-all cursor-pointer ${
+                                  activityType === id
+                                    ? 'btn-primary-develop shadow-xs'
+                                    : 'bg-black/5 text-[#555555] hover:bg-black/10'
+                                }`}
+                              >
+                                {label}
+                              </button>
+                            ))
+                          )}
                         </div>
                       </div>
 
                       <form onSubmit={handleCreateActivity} className="space-y-3 text-xs">
-                        <input
-                          type="text"
-                          required
-                          placeholder={
-                            activityType === 'call'
-                              ? 'Ej: Llamada con Rectoría sobre firma de convenio dual...'
-                              : activityType === 'meeting'
-                              ? 'Ej: Reunión presencial para mostrar kit de hackathon...'
-                              : 'Asunto o resumen breve...'
-                          }
-                          value={activityTitle}
-                          onChange={(e) => setActivityTitle(e.target.value)}
-                          className="input-develop w-full"
-                        />
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div className="sm:col-span-2">
+                            <input
+                              type="text"
+                              required
+                              placeholder={
+                                activityMode === 'minuta'
+                                  ? activityType === 'call'
+                                    ? 'Ej: Llamada con Rectoría sobre firma de convenio dual...'
+                                    : activityType === 'meeting'
+                                    ? 'Ej: Reunión presencial para mostrar kit de hackathon...'
+                                    : activityType === 'email'
+                                    ? 'Ej: Envío de propuesta formal por correo institucional...'
+                                    : 'Ej: Nota sobre requerimientos de rectoría...'
+                                  : activityType === 'call'
+                                  ? 'Ej: Llamada de seguimiento para confirmar fecha de visita...'
+                                  : activityType === 'meeting'
+                                  ? 'Ej: Cita presencial con Director de Vinculación...'
+                                  : 'Ej: Tarea: Enviar cotización y kit comercial a rectoría...'
+                              }
+                              value={activityTitle}
+                              onChange={(e) => setActivityTitle(e.target.value)}
+                              className="input-develop w-full"
+                            />
+                          </div>
+                          <div>
+                            <input
+                              type="date"
+                              required
+                              value={activityDate}
+                              onChange={(e) => setActivityDate(e.target.value)}
+                              className="input-develop w-full font-semibold text-[#0f094f]"
+                              title={activityMode === 'minuta' ? 'Fecha de realización' : 'Fecha programada'}
+                            />
+                          </div>
+                        </div>
+
                         <textarea
                           rows={2}
-                          placeholder="Detalles institucionales, compromisos acordados, siguientes pasos..."
+                          placeholder={
+                            activityMode === 'minuta'
+                              ? 'Acuerdos alcanzados, minutas institucionales, puntos tratados...'
+                              : 'Objetivo del compromiso, temas a tratar, requerimientos para la cita...'
+                          }
                           value={activityDesc}
                           onChange={(e) => setActivityDesc(e.target.value)}
                           className="input-develop w-full"
                         />
+
                         <div className="flex justify-end">
                           <button
                             type="submit"
-                            className="btn-primary-develop px-5 py-2 font-bold shadow-xs"
+                            className="btn-primary-develop px-5 py-2 font-bold shadow-xs flex items-center gap-1.5 cursor-pointer"
                           >
-                            Guardar en Expediente
+                            {activityMode === 'minuta' ? (
+                              <>
+                                <CheckCircle2 className="w-4 h-4" />
+                                <span>Guardar Minuta Realizada</span>
+                              </>
+                            ) : (
+                              <>
+                                <Clock className="w-4 h-4" />
+                                <span>Programar Compromiso Futuro</span>
+                              </>
+                            )}
                           </button>
                         </div>
                       </form>
@@ -1083,15 +1199,54 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
 
                     {/* Timeline Cronológico de Interacciones */}
                     <div className="space-y-3.5 flex-1">
-                      <h4 className="text-[10px] font-bold uppercase text-[#888888] tracking-widest">
-                        Línea de Tiempo & Registro Histórico
-                      </h4>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <h4 className="text-[10px] font-bold uppercase text-[#888888] tracking-widest">
+                          Línea de Tiempo & Registro Histórico
+                        </h4>
+                        <div className="inline-flex items-center p-1 rounded-xl bg-black/5 gap-1 shrink-0 overflow-x-auto">
+                          <button
+                            type="button"
+                            onClick={() => setFiltroTimeline('todas')}
+                            className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                              filtroTimeline === 'todas'
+                                ? 'bg-white text-[#0f094f] shadow-xs'
+                                : 'text-[#666666] hover:text-[#111111]'
+                            }`}
+                          >
+                            Todas ({companyActivities.length})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFiltroTimeline('pendientes')}
+                            className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                              filtroTimeline === 'pendientes'
+                                ? 'bg-amber-100 text-amber-900 shadow-xs'
+                                : 'text-[#666666] hover:text-[#111111]'
+                            }`}
+                          >
+                            Pendientes ({pendientesCount})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFiltroTimeline('completadas')}
+                            className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                              filtroTimeline === 'completadas'
+                                ? 'bg-emerald-100 text-emerald-900 shadow-xs'
+                                : 'text-[#666666] hover:text-[#111111]'
+                            }`}
+                          >
+                            Historial Realizado ({completadasCount})
+                          </button>
+                        </div>
+                      </div>
 
                       <div className="space-y-3">
-                        {companyActivities.map((act) => (
+                        {actividadesFiltradas.map((act) => (
                           <div
                             key={act.id}
-                            className="p-4 bg-white rounded-2xl border border-black/5 shadow-xs flex items-start gap-3.5"
+                            className={`p-4 bg-white rounded-2xl border transition-all shadow-xs flex items-start gap-3.5 ${
+                              act.completed ? 'border-black/5' : 'border-amber-200/80 bg-amber-50/20'
+                            }`}
                           >
                             <div className={`p-2.5 rounded-xl text-white shrink-0 ${
                               act.type === 'call' ? 'bg-[#0f094f]' :
@@ -1107,22 +1262,78 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
                             </div>
 
                             <div className="flex-1 min-w-0 text-xs">
-                              <div className="flex items-start sm:items-center justify-between gap-2">
-                                <span className="font-bold text-[#111111] truncate">{act.title}</span>
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                                <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                                  <span className="font-bold text-[#111111] truncate">{act.title}</span>
+                                  <span className="text-[10px] font-semibold uppercase text-[#555555] bg-black/5 px-2 py-0.5 rounded-md shrink-0">
+                                    {act.type === 'call' ? 'Llamada' :
+                                     act.type === 'meeting' ? 'Reunión' :
+                                     act.type === 'email' ? 'Email' :
+                                     act.type === 'task' ? 'Tarea' : 'Nota'}
+                                  </span>
+                                  {act.completed ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shrink-0">
+                                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                      <span>Realizada</span>
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200/80 shrink-0">
+                                      <Clock className="w-3 h-3 text-amber-600" />
+                                      <span>Pendiente</span>
+                                    </span>
+                                  )}
+                                </div>
                                 <span className="text-[10px] text-[#888888] font-mono shrink-0">{act.date}</span>
                               </div>
-                              <p className="text-[#555555] mt-1 leading-relaxed">{act.description}</p>
-                              <div className="text-[10px] text-[#888888] mt-2 flex items-center gap-1.5">
-                                <span>Registrado por:</span>
-                                <strong className="text-[#0f094f] font-semibold">{act.author}</strong>
+
+                              {act.description && (
+                                <p className="text-[#555555] mt-1.5 leading-relaxed">{act.description}</p>
+                              )}
+
+                              <div className="mt-2.5 pt-2 border-t border-black/5 flex items-center justify-between gap-2 text-[10px]">
+                                <div className="text-[#888888] flex items-center gap-1.5">
+                                  <span>Registrado por:</span>
+                                  <strong className="text-[#0f094f] font-semibold">{act.author}</strong>
+                                </div>
+
+                                <div>
+                                  {act.completed ? (
+                                    onToggleActivity && (
+                                      <button
+                                        type="button"
+                                        onClick={() => onToggleActivity(act.id)}
+                                        className="text-[#888888] hover:text-[#111111] font-semibold underline cursor-pointer transition-colors"
+                                        title="Reabrir compromiso como pendiente"
+                                      >
+                                        Reabrir
+                                      </button>
+                                    )
+                                  ) : (
+                                    onToggleActivity && (
+                                      <button
+                                        type="button"
+                                        onClick={() => onToggleActivity(act.id)}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 rounded-xl shadow-xs transition-all cursor-pointer"
+                                        title="Marcar compromiso como realizado"
+                                      >
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                        <span>Marcar como Realizada</span>
+                                      </button>
+                                    )
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </div>
                         ))}
 
-                        {companyActivities.length === 0 && (
+                        {actividadesFiltradas.length === 0 && (
                           <div className="text-center py-10 text-[#888888] text-xs card-light rounded-2xl">
-                            No hay actividades registradas recientemente en este expediente.
+                            {filtroTimeline === 'pendientes'
+                              ? 'No hay compromisos pendientes para este campus.'
+                              : filtroTimeline === 'completadas'
+                              ? 'No hay actividades realizadas registradas en este expediente.'
+                              : 'No hay actividades registradas recientemente en este expediente.'}
                           </div>
                         )}
                       </div>
@@ -1135,14 +1346,14 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
                   <div className="space-y-4 flex-1">
                     {/* Barra de búsqueda por nombre, carrera o correo */}
                     <div className="flex items-center gap-2">
-                      <div className="relative flex-1">
+                      <div className="relative flex items-center flex-1">
                         <Search className="w-3.5 h-3.5 text-[#888888] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                         <input
                           type="text"
                           placeholder="Buscar por nombre, carrera o correo..."
                           value={busquedaAlumnos}
                           onChange={(e) => setBusquedaAlumnos(e.target.value)}
-                          className="input-develop w-full pl-9 text-xs"
+                          className="input-develop w-full pl-10 text-xs"
                         />
                       </div>
                       {busquedaAlumnos && (

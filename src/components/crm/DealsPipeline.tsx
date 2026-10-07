@@ -30,9 +30,14 @@ import {
   Mail,
   MessageCircle, 
   Loader2,
-  Navigation
+  Navigation,
+  Check
 } from 'lucide-react';
-import { actualizarEtapaOportunidad, obtenerAlumnosPorOportunidad } from '../../services/servicioCrm';
+import { 
+  actualizarEtapaOportunidad, 
+  obtenerAlumnosPorOportunidad,
+  actualizarDetallesOportunidad 
+} from '../../services/servicioCrm';
 import { ProspectoAlumno } from '../../types/base_datos';
 
 interface DealsPipelineProps {
@@ -40,6 +45,7 @@ interface DealsPipelineProps {
   companies: Company[];
   onUpdateDealStage: (dealId: string, newStage: PipelineStage) => void;
   onAddDeal: (newDeal: Omit<Deal, 'id' | 'createdAt'>) => void;
+  onUpdateDealDetails?: (dealId: string, updates: Partial<Deal>) => void;
   onSelectSchoolForCRM?: (schoolId: string) => void;
   onOpenEventKit?: (dealId: string) => void;
   onAddActivity?: (activity: Omit<Activity, 'id'>) => void;
@@ -73,6 +79,7 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
   companies,
   onUpdateDealStage,
   onAddDeal,
+  onUpdateDealDetails,
   onSelectSchoolForCRM,
   onOpenEventKit,
   onAddActivity,
@@ -102,8 +109,50 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
   const [alumnosDeal, setAlumnosDeal] = useState<ProspectoAlumno[]>([]);
   const [cargandoAlumnosDeal, setCargandoAlumnosDeal] = useState(false);
 
-  // Estado para el Modal de Expediente Completo de la Oportunidad
+  // Estados para el Modal de Expediente Completo de la Oportunidad
   const [dealDetalleSeleccionado, setDealDetalleSeleccionado] = useState<Deal | null>(null);
+  const [fechaEditadaModal, setFechaEditadaModal] = useState('');
+  const [notasEditadasModal, setNotasEditadasModal] = useState('');
+  const [guardandoDetallesModal, setGuardandoDetallesModal] = useState(false);
+  const [mensajeExitoDetallesModal, setMensajeExitoDetallesModal] = useState<string | null>(null);
+
+  const abrirExpedienteDeal = (deal: Deal) => {
+    setDealDetalleSeleccionado(deal);
+    setFechaEditadaModal(deal.expectedCloseDate || '');
+    setNotasEditadasModal(deal.notes || '');
+    setMensajeExitoDetallesModal(null);
+  };
+
+  const handleGuardarDetallesDeal = async (dealId: string) => {
+    setGuardandoDetallesModal(true);
+    setMensajeExitoDetallesModal(null);
+    try {
+      await actualizarDetallesOportunidad(dealId, {
+        fecha_cierre_esperada: fechaEditadaModal || undefined,
+        notas: notasEditadasModal
+      });
+
+      if (onUpdateDealDetails) {
+        onUpdateDealDetails(dealId, {
+          expectedCloseDate: fechaEditadaModal,
+          notes: notasEditadasModal
+        });
+      }
+
+      setDealDetalleSeleccionado((prev) =>
+        prev && prev.id === dealId
+          ? { ...prev, expectedCloseDate: fechaEditadaModal, notes: notasEditadasModal }
+          : prev
+      );
+
+      setMensajeExitoDetallesModal('¡Detalles guardados exitosamente!');
+      setTimeout(() => setMensajeExitoDetallesModal(null), 3500);
+    } catch (error) {
+      console.error('Error actualizando detalles de la oportunidad:', error);
+    } finally {
+      setGuardandoDetallesModal(false);
+    }
+  };
 
   // Función para abrir modal y consultar alumnos del evento
   const abrirModalAlumnosDeal = async (deal: Deal) => {
@@ -462,8 +511,8 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
       {/* CONTROLES DE FILTROS AVANZADOS DEVELOP */}
       <div className="card-light p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex flex-1 flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[240px] max-w-sm">
-            <Search className="w-4 h-4 text-[#888888] absolute left-3.5 top-3.5" />
+          <div className="relative flex-1 min-w-[240px] max-w-sm flex items-center">
+            <Search className="w-4 h-4 text-[#888888] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               placeholder="Buscar por universidad, evento o marca..."
@@ -577,7 +626,7 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                   return (
                     <div
                       key={deal.id}
-                      onClick={() => setDealDetalleSeleccionado(deal)}
+                      onClick={() => abrirExpedienteDeal(deal)}
                       className="card-light card-light-hover p-4 text-left group rounded-[18px] flex flex-col justify-between h-[395px] cursor-pointer"
                     >
                       {/* Contenido Superior de la Tarjeta */}
@@ -846,8 +895,8 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                   <input
                     type="number"
                     required
-                    min="1000"
-                    step="5000"
+                    min="0"
+                    step="1000"
                     value={newAmount}
                     onChange={(e) => setNewAmount(e.target.value)}
                     className="input-develop w-full"
@@ -1243,11 +1292,18 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                     </div>
                   </div>
 
-                  <div className="p-3 bg-[#F8F8FC] rounded-2xl border border-black/5 space-y-1">
-                    <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">Fecha Programada / Cierre</span>
-                    <div className="font-bold text-[#111111] flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-[#888888]" />
-                      <span>{dealActual.expectedCloseDate || 'Sin fecha programada'}</span>
+                  <div className="p-3 bg-[#F8F8FC] rounded-2xl border border-black/5 space-y-1.5">
+                    <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">
+                      Fecha Programada / Cierre
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-3.5 h-3.5 text-[#29008e] shrink-0" />
+                      <input
+                        type="date"
+                        value={fechaEditadaModal}
+                        onChange={(e) => setFechaEditadaModal(e.target.value)}
+                        className="bg-white border border-black/10 rounded-xl px-2.5 py-1 text-xs font-bold text-[#0f094f] w-full focus:outline-none focus:border-[#29008e]"
+                      />
                     </div>
                   </div>
 
@@ -1264,14 +1320,40 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                   </div>
                 </div>
 
-                {/* Notas Completas de la Negociación */}
-                <div className="bg-[#F8F8FC] p-4 rounded-2xl border border-black/5 space-y-1.5">
-                  <span className="text-[11px] font-bold text-[#888888] uppercase tracking-wider block">
-                    Notas & Acuerdos de la Negociación
-                  </span>
-                  <p className="text-xs sm:text-sm text-[#222222] leading-relaxed whitespace-pre-wrap">
-                    {dealActual.notes || 'Sin notas registradas para esta oportunidad.'}
-                  </p>
+                {/* Notas Completas de la Negociación (Editables con persistencia) */}
+                <div className="bg-[#F8F8FC] p-4 rounded-2xl border border-black/5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-[#888888] uppercase tracking-wider block">
+                      Notas & Acuerdos de la Negociación
+                    </span>
+                    <button
+                      type="button"
+                      disabled={guardandoDetallesModal}
+                      onClick={() => handleGuardarDetallesDeal(dealActual.id)}
+                      className="px-2.5 py-1 rounded-xl bg-[#0f094f] hover:bg-[#29008e] text-white text-[11px] font-bold transition-all flex items-center gap-1 shadow-xs cursor-pointer disabled:opacity-50"
+                      title="Guardar cambios de fecha y notas en el CRM"
+                    >
+                      {guardandoDetallesModal ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Check className="w-3 h-3 text-[#a78bfa]" />
+                      )}
+                      <span>Guardar Acuerdos</span>
+                    </button>
+                  </div>
+                  <textarea
+                    rows={3}
+                    value={notasEditadasModal}
+                    onChange={(e) => setNotasEditadasModal(e.target.value)}
+                    placeholder="Escribe acuerdos, directores o notas de la negociación..."
+                    className="w-full bg-white border border-black/10 rounded-xl p-2.5 text-xs text-[#222222] leading-relaxed resize-y focus:outline-none focus:border-[#29008e]"
+                  />
+                  {mensajeExitoDetallesModal && (
+                    <div className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl animate-fadeIn flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>{mensajeExitoDetallesModal}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Selector de Etapa Rápida */}

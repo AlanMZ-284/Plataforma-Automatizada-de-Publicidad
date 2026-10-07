@@ -16,6 +16,7 @@ import {
   ContactoUniversidadInsercion,
   Oportunidad,
   OportunidadInsercion,
+  OportunidadActualizacion,
   EtapaOportunidad,
   ProspectoAlumno,
   ProspectoAlumnoInsercion,
@@ -912,6 +913,56 @@ export async function actualizarEtapaOportunidad(
         ...opo,
         etapa: nuevaEtapa,
         ultimo_cambio_etapa: ahoraIso,
+        actualizado_en: ahoraIso
+      };
+    }
+    return opo;
+  });
+  guardarOportunidadesRespaldo(actualizada);
+}
+
+/**
+ * Actualiza detalles clave de una oportunidad (fecha programada de cierre o notas de negociación).
+ */
+export async function actualizarDetallesOportunidad(
+  oportunidadId: string,
+  detalles: {
+    fecha_cierre_esperada?: string;
+    notas?: string;
+  }
+): Promise<void> {
+  const ahoraIso = new Date().toISOString();
+
+  // 1. Intentar actualizar en Supabase si está disponible
+  try {
+    const conexionDisponible = await verificarConexionSupabase();
+
+    if (conexionDisponible) {
+      const camposActualizar: OportunidadActualizacion = { actualizado_en: ahoraIso };
+      if (detalles.fecha_cierre_esperada !== undefined) {
+        camposActualizar.fecha_cierre_esperada = detalles.fecha_cierre_esperada;
+      }
+      if (detalles.notas !== undefined) {
+        camposActualizar.notas = detalles.notas;
+      }
+
+      await clienteSupabase
+        .from('oportunidades')
+        .update(camposActualizar)
+        .eq('id', oportunidadId);
+    }
+  } catch (error) {
+    console.warn('No se pudo actualizar detalles de oportunidad en Supabase; guardando en local.', error);
+  }
+
+  // 2. Actualizar en almacenamiento local de respaldo
+  const listaLocal = obtenerOportunidadesRespaldo();
+  const actualizada = listaLocal.map((opo) => {
+    if (opo.id === oportunidadId) {
+      return {
+        ...opo,
+        ...(detalles.fecha_cierre_esperada !== undefined ? { fecha_cierre_esperada: detalles.fecha_cierre_esperada } : {}),
+        ...(detalles.notas !== undefined ? { notas: detalles.notas } : {}),
         actualizado_en: ahoraIso
       };
     }
