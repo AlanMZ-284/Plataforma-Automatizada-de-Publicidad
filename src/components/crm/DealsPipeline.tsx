@@ -708,22 +708,16 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                           </button>
                         )}
 
-                        {/* Botón Trazar Ruta Logística */}
-                        {onTrazarRuta && (
+                        {/* Botón Planificar Ruta de Visita (Exclusivo para la etapa 'agendado') */}
+                        {onTrazarRuta && deal.stage === 'agendado' && (
                           <button
                             type="button"
                             onClick={() => onTrazarRuta(deal.companyId, deal.expectedCloseDate, deal.assignedRep)}
-                            className={`w-full py-1 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all border ${
-                              deal.stage === 'agendado'
-                                ? 'bg-gradient-to-r from-[#29008e] to-[#640354] hover:brightness-110 text-white border-transparent shadow-xs'
-                                : 'bg-[#29008e]/5 hover:bg-[#29008e]/10 text-[#29008e] border-[#29008e]/15'
-                            }`}
-                            title="Calcular circuito logístico, viáticos y navegación GPS"
+                            className="w-full py-1.5 px-2 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all bg-gradient-to-r from-[#29008e] to-[#640354] hover:brightness-110 text-white shadow-xs"
+                            title="Calcular circuito logístico, viáticos y navegación GPS para este campus agendado"
                           >
-                            <Navigation className="w-3.5 h-3.5 shrink-0" />
-                            <span className="truncate">
-                              {deal.stage === 'agendado' ? 'Planificar Ruta de Visita' : 'Trazar en Ruta'}
-                            </span>
+                            <Navigation className="w-3.5 h-3.5 shrink-0 text-white" />
+                            <span className="truncate">Planificar Ruta de Visita</span>
                           </button>
                         )}
 
