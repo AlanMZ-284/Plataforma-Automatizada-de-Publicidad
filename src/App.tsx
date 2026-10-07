@@ -113,6 +113,8 @@ export function App() {
 
   // Estados para la ruta precargada
   const [escuelaRutaSeleccionadaId, setEscuelaRutaSeleccionadaId] = useState<string | null>(null);
+  const [escuelasRutaIds, setEscuelasRutaIds] = useState<string[] | null>(null);
+  const [tituloGiraRuta, setTituloGiraRuta] = useState<string | undefined>(undefined);
   const [fechaRutaSeleccionada, setFechaRutaSeleccionada] = useState<string | undefined>(undefined);
   const [asesorRutaSeleccionada, setAsesorRutaSeleccionada] = useState<string | undefined>(undefined);
 
@@ -410,6 +412,17 @@ export function App() {
 
   const handleTrazarRutaParaEscuela = (escuelaId: string, fecha?: string, asesor?: string) => {
     setEscuelaRutaSeleccionadaId(escuelaId);
+    setEscuelasRutaIds(null);
+    setTituloGiraRuta(undefined);
+    if (fecha) setFechaRutaSeleccionada(fecha);
+    if (asesor) setAsesorRutaSeleccionada(asesor);
+    setCurrentView('routes');
+  };
+
+  const handleTrazarGiraMultisede = (schoolIds: string[], titulo?: string, fecha?: string, asesor?: string) => {
+    setEscuelasRutaIds(schoolIds);
+    setTituloGiraRuta(titulo);
+    setEscuelaRutaSeleccionadaId(null);
     if (fecha) setFechaRutaSeleccionada(fecha);
     if (asesor) setAsesorRutaSeleccionada(asesor);
     setCurrentView('routes');
@@ -760,6 +773,7 @@ export function App() {
                 onCargarSemilla={manejarCargarSemilla}
                 onIrAImportar={() => setCurrentView('crm-schools')}
                 onTrazarRuta={handleTrazarRutaParaEscuela}
+                onTrazarGiraMultisede={handleTrazarGiraMultisede}
               />
             )}
 
@@ -786,10 +800,14 @@ export function App() {
                 onSelectSchoolForCRM={handleOpenSchoolInCRM}
                 onLogRouteToCRM={handleLogRouteToCRM}
                 escuelaPreseleccionadaId={escuelaRutaSeleccionadaId}
+                escuelasPreseleccionadasIds={escuelasRutaIds}
+                tituloGiraPreseleccionada={tituloGiraRuta}
                 fechaPreseleccionada={fechaRutaSeleccionada}
                 asesorPreseleccionado={asesorRutaSeleccionada}
                 onLimpiarEscuelaPreseleccionada={() => {
                   setEscuelaRutaSeleccionadaId(null);
+                  setEscuelasRutaIds(null);
+                  setTituloGiraRuta(undefined);
                   setFechaRutaSeleccionada(undefined);
                   setAsesorRutaSeleccionada(undefined);
                 }}

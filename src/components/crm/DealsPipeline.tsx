@@ -47,6 +47,7 @@ interface DealsPipelineProps {
   onCargarSemilla?: () => void;
   onIrAImportar?: () => void;
   onTrazarRuta?: (schoolId: string, fecha?: string, asesor?: string) => void;
+  onTrazarGiraMultisede?: (schoolIds: string[], tituloGira?: string, fecha?: string, asesor?: string) => void;
 }
 
 // 6 etapas con colores armónicos alineados a la identidad visual Develop
@@ -78,13 +79,19 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
   onAbrirRegistroQr,
   onCargarSemilla,
   onIrAImportar,
-  onTrazarRuta
+  onTrazarRuta,
+  onTrazarGiraMultisede
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRep, setSelectedRep] = useState('todos');
   const [selectedModalityFilter, setSelectedModalityFilter] = useState<'todos' | ProjectModality>('todos');
   const [selectedEventTypeFilter, setSelectedEventTypeFilter] = useState<'todos' | EventType>('todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Estados para el Modal de Planificación de Gira Multisede
+  const [modalGiraAbierto, setModalGiraAbierto] = useState(false);
+  const [fechaFiltroGira, setFechaFiltroGira] = useState<string>('todas');
+  const [dealsSeleccionadosGira, setDealsSeleccionadosGira] = useState<string[]>([]);
 
   // Estados para validaciones y notificaciones de avance
   const [mensajeValidacion, setMensajeValidacion] = useState<string | null>(null);
@@ -543,6 +550,22 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                     ${stageTotal.toLocaleString('es-MX')}
                   </span>
                 </div>
+
+                {stage === 'agendado' && onTrazarGiraMultisede && stageDeals.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDealsSeleccionadosGira(stageDeals.map((d) => d.id));
+                      setFechaFiltroGira('todas');
+                      setModalGiraAbierto(true);
+                    }}
+                    className="w-full mt-2.5 py-1.5 px-2 rounded-xl bg-gradient-to-r from-[#29008e] to-[#640354] hover:brightness-110 text-white text-[10px] font-bold flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                    title="Planificar gira combinando visitas agendadas en un solo circuito de viaje"
+                  >
+                    <Navigation className="w-3 h-3 text-white" />
+                    <span>Planificar Gira Multisede ({stageDeals.length})</span>
+                  </button>
+                )}
               </div>
 
               {/* Lista de Tarjetas de Tratos */}
@@ -1315,6 +1338,192 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                   className="btn-secondary-develop px-4 py-2 text-xs font-bold cursor-pointer"
                 >
                   Cerrar Expediente
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* MODAL DE PLANIFICACIÓN Y LANZAMIENTO DE GIRA MULTISEDE */}
+      {modalGiraAbierto && (() => {
+        const dealsAgendados = deals.filter((d) => d.stage === 'agendado');
+        const fechasUnicas = Array.from(
+          new Set(dealsAgendados.map((d) => d.expectedCloseDate).filter((f): f is string => Boolean(f && f.trim())))
+        ).sort();
+
+        const dealsFiltrados = fechaFiltroGira === 'todas'
+          ? dealsAgendados
+          : dealsAgendados.filter((d) => d.expectedCloseDate === fechaFiltroGira);
+
+        const toggleSeleccionDeal = (dealId: string) => {
+          setDealsSeleccionadosGira((prev) =>
+            prev.includes(dealId) ? prev.filter((id) => id !== dealId) : [...prev, dealId]
+          );
+        };
+
+        const handleConfirmarGira = () => {
+          if (!onTrazarGiraMultisede) return;
+          const tratosElegidos = dealsAgendados.filter((d) => dealsSeleccionadosGira.includes(d.id));
+          const schoolIds = Array.from(new Set(tratosElegidos.map((d) => d.companyId)));
+          if (schoolIds.length === 0) return;
+
+          const fechaGira = fechaFiltroGira !== 'todas' ? fechaFiltroGira : tratosElegidos[0]?.expectedCloseDate;
+          const asesorGira = tratosElegidos[0]?.assignedRep;
+          const titulo = `Gira Comercial: ${schoolIds.length} Campus Agendados`;
+
+          onTrazarGiraMultisede(schoolIds, titulo, fechaGira, asesorGira);
+          setModalGiraAbierto(false);
+        };
+
+        return (
+          <div className="fixed inset-0 z-50 bg-[#07052e]/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-fadeIn">
+            <div
+              className="fixed inset-0 cursor-pointer"
+              onClick={() => setModalGiraAbierto(false)}
+            />
+
+            <div className="relative z-10 max-w-xl w-full bg-white rounded-[28px] overflow-hidden shadow-develop-modal border border-black/10 flex flex-col max-h-[85vh] animate-scaleUp">
+              {/* Cabecera Dark Premium */}
+              <div className="premium-dark-surface p-5 sm:p-6 text-white border-b border-white/10 relative shrink-0">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1.5 min-w-0">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-[#a78bfa] block">
+                      LOGÍSTICA & RUTAS · GIRA COMERCIAL DE VISITAS
+                    </span>
+                    <h3 className="text-lg sm:text-xl font-bold text-white leading-snug">
+                      Planificar Gira de Visitas Agendadas
+                    </h3>
+                    <p className="text-xs sm:text-sm text-white/70">
+                      Agrupa eventos con fecha confirmada para optimizar kilometraje, tiempos y viáticos en un solo viaje.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setModalGiraAbierto(false)}
+                    className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+                    title="Cerrar modal"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Cuerpo con Scroll */}
+              <div className="p-5 sm:p-6 space-y-4 overflow-y-auto bg-white flex-1">
+                {/* Filtro de fecha */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-[#111111] uppercase tracking-wider block">
+                    Filtrar Eventos por Fecha Agendada
+                  </label>
+                  <select
+                    value={fechaFiltroGira}
+                    onChange={(e) => {
+                      const f = e.target.value;
+                      setFechaFiltroGira(f);
+                      if (f === 'todas') {
+                        setDealsSeleccionadosGira(dealsAgendados.map((d) => d.id));
+                      } else {
+                        setDealsSeleccionadosGira(dealsAgendados.filter((d) => d.expectedCloseDate === f).map((d) => d.id));
+                      }
+                    }}
+                    className="input-develop w-full text-xs font-semibold text-[#0f094f]"
+                  >
+                    <option value="todas">Todas las fechas agendadas ({dealsAgendados.length} iniciativas)</option>
+                    {fechasUnicas.map((fecha) => {
+                      const conteo = dealsAgendados.filter((d) => d.expectedCloseDate === fecha).length;
+                      return (
+                        <option key={fecha} value={fecha}>
+                          {fecha} ({conteo} {conteo === 1 ? 'visita' : 'visitas'})
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                {/* Lista de eventos agendados */}
+                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                  {dealsFiltrados.map((deal) => {
+                    const company = companyMap.get(deal.companyId);
+                    const estaSeleccionado = dealsSeleccionadosGira.includes(deal.id);
+
+                    return (
+                      <div
+                        key={deal.id}
+                        onClick={() => toggleSeleccionDeal(deal.id)}
+                        className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                          estaSeleccionado
+                            ? 'bg-[#29008e]/5 border-[#29008e]/30'
+                            : 'bg-[#F8F8FC] border-black/5 hover:border-black/10'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={estaSeleccionado}
+                            onChange={() => toggleSeleccionDeal(deal.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-4 h-4 rounded text-[#29008e] focus:ring-[#29008e] cursor-pointer"
+                          />
+                          <div className="min-w-0 space-y-0.5">
+                            <div className="font-bold text-xs text-[#111111] truncate">
+                              {company?.name || 'Campus Universitario'}
+                            </div>
+                            <div className="text-[11px] text-[#555555] truncate">
+                              {company?.municipality ? `${company.municipality}, ` : ''}{company?.state || ''} · <span className="font-medium text-[#111111]">{deal.title}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0 text-[10px] space-y-0.5">
+                          <div className="font-bold text-[#0f094f] flex items-center gap-1 justify-end">
+                            <Calendar className="w-3 h-3 text-[#29008e]" />
+                            <span>{deal.expectedCloseDate || 'Sin fecha'}</span>
+                          </div>
+                          <div className="text-[#888888] flex items-center gap-1 justify-end">
+                            <User className="w-3 h-3 text-[#888888]" />
+                            <span>{deal.assignedRep.split(' ')[0]}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {dealsFiltrados.length === 0 && (
+                    <div className="p-6 text-center text-xs text-[#888888] bg-[#F8F8FC] rounded-2xl border border-black/5">
+                      No hay visitas agendadas para la fecha seleccionada.
+                    </div>
+                  )}
+                </div>
+
+                {/* Tarjeta de resumen de optimización */}
+                <div className="p-3.5 rounded-2xl bg-[#0f094f]/5 border border-[#29008e]/15 flex items-start gap-2.5">
+                  <Sparkles className="w-4 h-4 text-[#29008e] shrink-0 mt-0.5" />
+                  <div className="text-xs text-[#333333] leading-relaxed">
+                    <strong className="text-[#0f094f]">{dealsSeleccionadosGira.length} campus seleccionados</strong> para la gira. El algoritmo 2-Opt TSP ordenará automáticamente las paradas para minimizar el tráfico y los viáticos.
+                  </div>
+                </div>
+              </div>
+
+              {/* Pie de Acciones */}
+              <div className="p-4 sm:p-5 bg-[#F8F8FC] border-t border-black/5 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setModalGiraAbierto(false)}
+                  className="btn-secondary-develop px-4 py-2 text-xs font-bold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="button"
+                  disabled={dealsSeleccionadosGira.length === 0}
+                  onClick={handleConfirmarGira}
+                  className="px-4 py-2 text-xs font-bold text-white bg-gradient-to-r from-[#29008e] to-[#640354] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Navigation className="w-3.5 h-3.5 text-white" />
+                  <span>Generar Circuito y Viáticos de la Gira ({dealsSeleccionadosGira.length} Campus)</span>
                 </button>
               </div>
             </div>
