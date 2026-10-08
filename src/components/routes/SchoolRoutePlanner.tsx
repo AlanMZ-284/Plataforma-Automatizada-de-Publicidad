@@ -36,7 +36,12 @@ import {
   FlagTriangleRight,
   QrCode,
   History,
-  RotateCcw
+  RotateCcw,
+  X,
+  User,
+  DollarSign,
+  Layers,
+  Info
 } from 'lucide-react';
 
 interface SchoolRoutePlannerProps {
@@ -105,6 +110,7 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
   // Historial de Giras Comerciales Agendadas en el CRM
   const [girasGuardadas, setGirasGuardadas] = useState<any[]>([]);
   const [cargandoGirasGuardadas, setCargandoGirasGuardadas] = useState<boolean>(false);
+  const [giraModalSeleccionada, setGiraModalSeleccionada] = useState<any | null>(null);
 
   const cargarGirasGuardadas = async () => {
     setCargandoGirasGuardadas(true);
@@ -1030,7 +1036,8 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
               return (
                 <div
                   key={gira.id || index}
-                  className="card-light card-light-hover p-4 sm:p-5 rounded-2xl border border-black/5 flex flex-col justify-between space-y-3.5"
+                  onClick={() => setGiraModalSeleccionada(gira)}
+                  className="card-light card-light-hover p-4 sm:p-5 rounded-2xl border border-black/5 flex flex-col justify-between space-y-3.5 cursor-pointer"
                 >
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-2">
@@ -1090,27 +1097,46 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
                   </div>
 
                   {/* Acciones de la gira */}
-                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-black/5">
-                    <button
-                      type="button"
-                      onClick={() => handleRecargarGira(gira)}
-                      className="px-3 py-1.5 rounded-xl bg-[#0f094f]/5 hover:bg-[#0f094f]/10 text-[#0f094f] text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
-                      title="Cargar esta gira en el mapa interactivo TSP"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5 text-[#29008e]" />
-                      <span>Recargar Circuito</span>
-                    </button>
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-black/5">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setGiraModalSeleccionada(gira);
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-[#29008e]/10 hover:bg-[#29008e]/15 text-[#29008e] text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                        title="Ver itinerario de paradas y desglose de viáticos"
+                      >
+                        <Layers className="w-3.5 h-3.5 text-[#29008e]" />
+                        <span>Ver Desglose</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRecargarGira(gira);
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-[#0f094f]/5 hover:bg-[#0f094f]/10 text-[#0f094f] text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                        title="Cargar esta gira en el mapa interactivo TSP"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 text-[#0f094f]" />
+                        <span className="hidden sm:inline">Recargar</span>
+                      </button>
+                    </div>
 
                     {linkMaps && (
                       <a
                         href={linkMaps}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
                         className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#29008e] to-[#640354] hover:brightness-110 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs"
                         title="Abrir recorrido completo en Google Maps"
                       >
                         <ExternalLink className="w-3.5 h-3.5 text-white" />
-                        <span>Ver en Maps</span>
+                        <span>Maps</span>
                       </a>
                     )}
                   </div>
@@ -1120,6 +1146,260 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
           </div>
         )}
       </div>
+
+      {/* ============================================================== */}
+      {/* MODAL DE EXPEDIENTE COMPLETO DE GIRA COMERCIAL                 */}
+      {/* ============================================================== */}
+      {giraModalSeleccionada && (() => {
+        const gira = giraModalSeleccionada;
+        const fechaTexto = gira.fecha_gira || gira.fecha_inicio || (gira.creado_en ? gira.creado_en.split('T')[0] : 'Fecha no especificada');
+        const paradas: any[] = gira.paradas || gira.datos_adicionales?.paradas || [];
+        const viaticosTotal = gira.total_viaticos_mxn || gira.viaticos?.total_viaticos_mxn || 0;
+        const gasolina = gira.presupuesto_gasolina_mxn || gira.viaticos?.gasolina_mxn || 0;
+        const casetas = gira.presupuesto_casetas_mxn || gira.viaticos?.casetas_mxn || 0;
+        const alimentos = gira.presupuesto_alimentos_mxn || gira.viaticos?.alimentos_mxn || 0;
+        const ganancia = gira.porcentaje_ganancia_eficiencia || 0;
+        const km = gira.distancia_total_km || 0;
+        const linkMaps = gira.enlace_google_maps || '';
+        const asesor = gira.asesor_responsable || 'Carlos Mendoza';
+        const tituloGira = gira.titulo || `Gira Multisede (${paradas.length} paradas)`;
+        const origen = gira.origen_nombre || 'Corporativo Develop CDMX';
+
+        return (
+          <div className="fixed inset-0 z-50 bg-[#07052e]/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-fadeIn">
+            {/* Backdrop interactivo */}
+            <div
+              className="fixed inset-0 cursor-pointer"
+              onClick={() => setGiraModalSeleccionada(null)}
+            />
+
+            {/* Tarjeta Central del Modal */}
+            <div className="relative z-10 bg-white rounded-[28px] max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-develop-modal border border-black/10 animate-scaleUp">
+              {/* Cabecera Dark Premium */}
+              <div className="premium-dark-surface p-5 sm:p-6 text-white border-b border-white/10 relative shrink-0">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1.5 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-[#a78bfa]">
+                        LOGÍSTICA · EXPEDIENTE DE GIRA COMERCIAL
+                      </span>
+                      <span className="text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        {fechaTexto}
+                      </span>
+                    </div>
+                    <h3 className="text-lg sm:text-xl font-bold text-white mt-1 leading-snug break-words">
+                      {tituloGira}
+                    </h3>
+                    <p className="text-xs sm:text-sm text-white/70">
+                      Asesor: <strong className="text-white">{asesor}</strong> · Origen: {origen}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setGiraModalSeleccionada(null)}
+                    className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+                    title="Cerrar expediente"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Cuerpo con Scroll */}
+              <div className="p-5 sm:p-6 space-y-5 overflow-y-auto bg-white flex-1">
+                {/* Desglose Financiero de Viáticos Autorizados */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-[#111111] uppercase tracking-wider flex items-center gap-1.5">
+                      <Receipt className="w-3.5 h-3.5 text-[#29008e]" />
+                      <span>Desglose Financiero de Viáticos Autorizados</span>
+                    </h4>
+                    <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                      Eficiencia Algorítmica: +{ganancia}%
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="card-light p-3 rounded-2xl border border-black/5 space-y-1">
+                      <div className="flex items-center gap-1 text-[10px] font-bold text-[#888888] uppercase tracking-wider">
+                        <Fuel className="w-3 h-3 text-[#29008e]" />
+                        <span>Gasolina</span>
+                      </div>
+                      <div className="text-sm sm:text-base font-extrabold text-[#111111]">
+                        ${Number(gasolina).toLocaleString('es-MX')}
+                      </div>
+                      <span className="text-[9px] text-[#888888] block">Estimación de combustible</span>
+                    </div>
+
+                    <div className="card-light p-3 rounded-2xl border border-black/5 space-y-1">
+                      <div className="flex items-center gap-1 text-[10px] font-bold text-[#888888] uppercase tracking-wider">
+                        <Car className="w-3 h-3 text-[#640354]" />
+                        <span>Casetas / Peaje</span>
+                      </div>
+                      <div className="text-sm sm:text-base font-extrabold text-[#111111]">
+                        ${Number(casetas).toLocaleString('es-MX')}
+                      </div>
+                      <span className="text-[9px] text-[#888888] block">Autopistas y libramientos</span>
+                    </div>
+
+                    <div className="card-light p-3 rounded-2xl border border-black/5 space-y-1">
+                      <div className="flex items-center gap-1 text-[10px] font-bold text-[#888888] uppercase tracking-wider">
+                        <Utensils className="w-3 h-3 text-amber-600" />
+                        <span>Alimentos</span>
+                      </div>
+                      <div className="text-sm sm:text-base font-extrabold text-[#111111]">
+                        ${Number(alimentos).toLocaleString('es-MX')}
+                      </div>
+                      <span className="text-[9px] text-[#888888] block">Cuota diaria en campo</span>
+                    </div>
+
+                    <div className="card-light p-3 rounded-2xl border border-[#29008e]/20 bg-[#29008e]/[0.03] space-y-1">
+                      <div className="flex items-center gap-1 text-[10px] font-bold text-[#29008e] uppercase tracking-wider">
+                        <DollarSign className="w-3 h-3 text-[#29008e]" />
+                        <span>Total Viáticos</span>
+                      </div>
+                      <div className="text-sm sm:text-base font-black text-[#29008e]">
+                        ${Number(viaticosTotal).toLocaleString('es-MX')}
+                      </div>
+                      <span className="text-[9px] text-[#29008e]/80 font-semibold block">Presupuesto autorizado</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Resumen de Movilidad */}
+                <div className="p-3.5 bg-[#F8F8FC] rounded-2xl border border-black/5 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                  <div>
+                    <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">Distancia Total</span>
+                    <span className="font-bold text-[#111111]">{km} kilómetros</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">Sedes a Visitar</span>
+                    <span className="font-bold text-[#111111]">{paradas.length} campus universitarios</span>
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">Horario Estimado</span>
+                    <span className="font-bold text-[#0f094f]">Jornada de 09:00 a 16:30 hrs</span>
+                  </div>
+                </div>
+
+                {/* Itinerario de Paradas Ordenadas */}
+                <div className="space-y-2.5">
+                  <h4 className="text-xs font-bold text-[#111111] uppercase tracking-wider flex items-center gap-1.5">
+                    <Navigation className="w-3.5 h-3.5 text-[#29008e]" />
+                    <span>Itinerario Cronológico de Visita ({paradas.length} Sedes)</span>
+                  </h4>
+
+                  <div className="space-y-2">
+                    {paradas.map((parada: any, idx: number) => {
+                      const nombre = parada.nombre || parada.name || 'Campus Universitario';
+                      const hora = parada.hora_reunion_recomendada || parada.recommendedMeetingHour || '09:00 hrs';
+                      const director = parada.director_nombre || parada.directorName || 'Director(a) de Vinculación';
+                      const telefono = parada.director_telefono || parada.phone || '';
+                      const escuelaId = parada.universidad_id || parada.schoolId;
+
+                      return (
+                        <div
+                          key={idx}
+                          className="p-3.5 bg-[#F8F8FC] hover:bg-white rounded-2xl border border-black/5 hover:border-black/10 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
+                        >
+                          <div className="flex items-start gap-3 min-w-0">
+                            <div className="w-7 h-7 rounded-full bg-[#0f094f] text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                              {idx + 1}
+                            </div>
+                            <div className="min-w-0 space-y-0.5">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h5 className="text-xs font-bold text-[#111111] truncate">
+                                  {nombre}
+                                </h5>
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#29008e]/10 text-[#29008e]">
+                                  Llegada: {hora}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-[#555555]">
+                                Cita con: <strong>{director}</strong> {telefono ? `· Tel: ${telefono}` : ''}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+                            {onSelectSchoolForCRM && escuelaId && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onSelectSchoolForCRM(escuelaId);
+                                  setGiraModalSeleccionada(null);
+                                }}
+                                className="px-2.5 py-1 rounded-xl text-[11px] font-bold text-[#0f094f] hover:bg-black/5 transition-colors border border-black/10 cursor-pointer"
+                                title="Abrir expediente de la escuela en el CRM"
+                              >
+                                Expediente 360°
+                              </button>
+                            )}
+
+                            {onAbrirStandQr && escuelaId && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onAbrirStandQr(escuelaId);
+                                  setGiraModalSeleccionada(null);
+                                }}
+                                className="px-2.5 py-1 rounded-xl text-[11px] font-bold text-[#640354] bg-[#640354]/10 hover:bg-[#640354]/15 transition-colors border border-[#640354]/20 flex items-center gap-1 cursor-pointer"
+                                title="Abrir módulo de registro QR de alumnos en stand"
+                              >
+                                <QrCode className="w-3 h-3 text-[#640354]" />
+                                <span>Stand QR</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Pie de Acciones */}
+              <div className="p-4 sm:p-5 bg-[#F8F8FC] border-t border-black/5 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleRecargarGira(gira);
+                    setGiraModalSeleccionada(null);
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-[#0f094f]/5 hover:bg-[#0f094f]/10 text-[#0f094f] text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-[#29008e]" />
+                  <span>Recargar en Mapa TSP</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  {linkMaps && (
+                    <a
+                      href={linkMaps}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#29008e] to-[#640354] hover:brightness-110 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs"
+                      title="Navegar ruta en Google Maps"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 text-white" />
+                      <span>Abrir en Google Maps</span>
+                    </a>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setGiraModalSeleccionada(null)}
+                    className="btn-secondary-develop px-4 py-2 text-xs font-bold cursor-pointer"
+                  >
+                    Cerrar Expediente
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

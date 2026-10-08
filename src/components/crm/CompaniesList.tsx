@@ -130,6 +130,8 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
   const [formContactoTelefono, setFormContactoTelefono] = useState('');
 
   // Estados para nuevo log de actividad
+  const [nuevaCarreraTexto, setNuevaCarreraTexto] = useState('');
+  const [guardandoCarrera, setGuardandoCarrera] = useState(false);
   const [activityType, setActivityType] = useState<'call' | 'meeting' | 'email' | 'note' | 'task'>('call');
   const [activityTitle, setActivityTitle] = useState('');
   const [activityDesc, setActivityDesc] = useState('');
@@ -280,6 +282,77 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
     setTimeout(() => {
       setMensajeExitoImportacion(null);
     }, 6000);
+  };
+
+  const handleAgregarCarrera = async () => {
+    if (!activeCompany || !nuevaCarreraTexto.trim()) return;
+    setGuardandoCarrera(true);
+    try {
+      const carrerasPrevias: string[] = Array.isArray(activeCompany.datos_adicionales?.carreras)
+        ? activeCompany.datos_adicionales.carreras
+        : [];
+      
+      if (carrerasPrevias.includes(nuevaCarreraTexto.trim())) {
+        setNuevaCarreraTexto('');
+        setGuardandoCarrera(false);
+        return;
+      }
+
+      const nuevasCarreras = [...carrerasPrevias, nuevaCarreraTexto.trim()];
+      const nuevosDatosAdicionales = {
+        ...(activeCompany.datos_adicionales || {}),
+        carreras: nuevasCarreras
+      };
+
+      await actualizarUniversidadEnBD(activeCompany.id, {
+        datos_adicionales: nuevosDatosAdicionales
+      });
+
+      const companiaModificada: Company = {
+        ...activeCompany,
+        datos_adicionales: nuevosDatosAdicionales
+      };
+
+      setCompaniasLocales((prev) =>
+        prev.map((c) => (c.id === activeCompany.id ? companiaModificada : c))
+      );
+
+      setNuevaCarreraTexto('');
+    } catch (e) {
+      console.error('Error agregando carrera:', e);
+    } finally {
+      setGuardandoCarrera(false);
+    }
+  };
+
+  const handleEliminarCarrera = async (carreraAEliminar: string) => {
+    if (!activeCompany) return;
+    try {
+      const carrerasPrevias: string[] = Array.isArray(activeCompany.datos_adicionales?.carreras)
+        ? activeCompany.datos_adicionales.carreras
+        : [];
+
+      const nuevasCarreras = carrerasPrevias.filter((c) => c !== carreraAEliminar);
+      const nuevosDatosAdicionales = {
+        ...(activeCompany.datos_adicionales || {}),
+        carreras: nuevasCarreras
+      };
+
+      await actualizarUniversidadEnBD(activeCompany.id, {
+        datos_adicionales: nuevosDatosAdicionales
+      });
+
+      const companiaModificada: Company = {
+        ...activeCompany,
+        datos_adicionales: nuevosDatosAdicionales
+      };
+
+      setCompaniasLocales((prev) =>
+        prev.map((c) => (c.id === activeCompany.id ? companiaModificada : c))
+      );
+    } catch (e) {
+      console.error('Error eliminando carrera:', e);
+    }
   };
 
   const filteredCompanies = companiasLocales.filter((c) => {
@@ -802,8 +875,79 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
                   </div>
                 </div>
 
+                {/* Carreras & Especialidades del Campus */}
+                <div>
+                  <div className="flex items-center justify-between mb-2.5">
+                    <div className="flex items-center gap-1.5">
+                      <GraduationCap className="w-3.5 h-3.5 text-[#29008e]" />
+                      <h4 className="text-[10px] font-bold uppercase text-[#888888] tracking-widest">
+                        Carreras & Especialidades del Campus
+                      </h4>
+                    </div>
+                    {Array.isArray(activeCompany.datos_adicionales?.carreras) && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-[#29008e]/10 text-[#29008e]">
+                        {activeCompany.datos_adicionales.carreras.length} carreras
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="card-light p-3.5 text-xs rounded-2xl bg-white border border-black/5 space-y-2.5">
+                    {/* Lista de carreras registradas */}
+                    <div className="flex flex-wrap gap-1.5">
+                      {Array.isArray(activeCompany.datos_adicionales?.carreras) && activeCompany.datos_adicionales.carreras.length > 0 ? (
+                        activeCompany.datos_adicionales.carreras.map((carrera: string) => (
+                          <span
+                            key={carrera}
+                            className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-xl bg-[#0f094f]/5 text-[#0f094f] border border-[#0f094f]/10"
+                          >
+                            <span>{carrera}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleEliminarCarrera(carrera)}
+                              className="text-slate-400 hover:text-red-500 p-0.5 rounded cursor-pointer"
+                              title={`Eliminar ${carrera} de esta institución`}
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))
+                      ) : (
+                        <div className="text-[11px] text-slate-500 italic py-1">
+                          Sin carreras específicas vinculadas (el stand QR ofrecerá el catálogo tecnológico general).
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Input rápido para agregar carrera */}
+                    <div className="pt-2 border-t border-black/5 flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        placeholder="Ej. Ing. en Inteligencia Artificial..."
+                        value={nuevaCarreraTexto}
+                        onChange={(e) => setNuevaCarreraTexto(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAgregarCarrera();
+                          }
+                        }}
+                        className="input-develop text-xs py-1.5 px-2.5 flex-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAgregarCarrera}
+                        disabled={guardandoCarrera || !nuevaCarreraTexto.trim()}
+                        className="px-3 py-1.5 rounded-xl bg-[#0f094f] text-white hover:bg-[#29008e] text-xs font-bold transition-all disabled:opacity-40 shrink-0 inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Añadir</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Metadatos Excel (JSONB) - Columnas Libres */}
-                {activeCompany.datos_adicionales && Object.keys(activeCompany.datos_adicionales).length > 0 && (
+                {activeCompany.datos_adicionales && Object.keys(activeCompany.datos_adicionales).filter((k) => k !== 'carreras').length > 0 && (
                   <div>
                     <div className="flex items-center justify-between mb-2.5">
                       <div className="flex items-center gap-1.5">
@@ -813,12 +957,12 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
                         </h4>
                       </div>
                       <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-[#29008e]/10 text-[#29008e]">
-                        {Object.keys(activeCompany.datos_adicionales).length} {Object.keys(activeCompany.datos_adicionales).length === 1 ? 'campo' : 'campos'}
+                        {Object.keys(activeCompany.datos_adicionales).filter((k) => k !== 'carreras').length} {Object.keys(activeCompany.datos_adicionales).filter((k) => k !== 'carreras').length === 1 ? 'campo' : 'campos'}
                       </span>
                     </div>
 
                     <div className="card-light p-4 space-y-2.5 text-xs rounded-2xl bg-white border border-black/5 divide-y divide-black/5">
-                      {Object.entries(activeCompany.datos_adicionales).map(([clave, valor], idx) => {
+                      {Object.entries(activeCompany.datos_adicionales).filter(([k]) => k !== 'carreras').map(([clave, valor], idx) => {
                         const valorFormateado =
                           valor === null || valor === undefined || valor === ''
                             ? '—'

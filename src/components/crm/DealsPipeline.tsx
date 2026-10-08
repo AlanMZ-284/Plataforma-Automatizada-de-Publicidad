@@ -31,12 +31,18 @@ import {
   MessageCircle, 
   Loader2,
   Navigation,
-  Check
+  Check,
+  Trash2,
+  Edit3,
+  Ban,
+  RotateCcw,
+  ShieldCheck
 } from 'lucide-react';
 import { 
   actualizarEtapaOportunidad, 
   obtenerAlumnosPorOportunidad,
-  actualizarDetallesOportunidad 
+  actualizarDetallesOportunidad,
+  eliminarOportunidadEnBd
 } from '../../services/servicioCrm';
 import { ProspectoAlumno } from '../../types/base_datos';
 
@@ -46,6 +52,8 @@ interface DealsPipelineProps {
   onUpdateDealStage: (dealId: string, newStage: PipelineStage) => void;
   onAddDeal: (newDeal: Omit<Deal, 'id' | 'createdAt'>) => void;
   onUpdateDealDetails?: (dealId: string, updates: Partial<Deal>) => void;
+  onDeleteDeal?: (dealId: string) => void;
+  esSuperusuario?: boolean;
   onSelectSchoolForCRM?: (schoolId: string) => void;
   onOpenEventKit?: (dealId: string) => void;
   onAddActivity?: (activity: Omit<Activity, 'id'>) => void;
@@ -80,6 +88,8 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
   onUpdateDealStage,
   onAddDeal,
   onUpdateDealDetails,
+  onDeleteDeal,
+  esSuperusuario = false,
   onSelectSchoolForCRM,
   onOpenEventKit,
   onAddActivity,
@@ -102,6 +112,13 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
 
   // Estados para validaciones y notificaciones de avance
   const [mensajeValidacion, setMensajeValidacion] = useState<string | null>(null);
+  const [transicionAdvertencia, setTransicionAdvertencia] = useState<{
+    dealId: string;
+    currentStage: PipelineStage;
+    targetStage: PipelineStage;
+    motivo: string;
+    titulo: string;
+  } | null>(null);
   const [alertaExito, setAlertaExito] = useState<{ titulo: string; mensaje: string } | null>(null);
 
   // Estados para el Modal de Alumnos por Oportunidad
@@ -111,15 +128,33 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
 
   // Estados para el Modal de Expediente Completo de la Oportunidad
   const [dealDetalleSeleccionado, setDealDetalleSeleccionado] = useState<Deal | null>(null);
+  const [modoEdicionModal, setModoEdicionModal] = useState(false);
+  const [tituloEditadoModal, setTituloEditadoModal] = useState('');
+  const [montoEditadoModal, setMontoEditadoModal] = useState('');
+  const [modalidadEditadaModal, setModalidadEditadaModal] = useState<ProjectModality>('modalidad_a_programa');
+  const [tipoEventoEditadoModal, setTipoEventoEditadoModal] = useState<EventType>('hackathon');
+  const [marcasEditadasModal, setMarcasEditadasModal] = useState('');
   const [fechaEditadaModal, setFechaEditadaModal] = useState('');
   const [notasEditadasModal, setNotasEditadasModal] = useState('');
+  const [canceladoModal, setCanceladoModal] = useState(false);
+  const [motivoCancelacionModal, setMotivoCancelacionModal] = useState('');
+  const [mostrarCampoCancelacion, setMostrarCampoCancelacion] = useState(false);
   const [guardandoDetallesModal, setGuardandoDetallesModal] = useState(false);
   const [mensajeExitoDetallesModal, setMensajeExitoDetallesModal] = useState<string | null>(null);
 
   const abrirExpedienteDeal = (deal: Deal) => {
     setDealDetalleSeleccionado(deal);
+    setModoEdicionModal(false);
+    setTituloEditadoModal(deal.title);
+    setMontoEditadoModal(deal.amount.toString());
+    setModalidadEditadaModal(deal.projectModality);
+    setTipoEventoEditadoModal(deal.eventType);
+    setMarcasEditadasModal(deal.alliedBrands ? deal.alliedBrands.join(', ') : '');
     setFechaEditadaModal(deal.expectedCloseDate || '');
     setNotasEditadasModal(deal.notes || '');
+    setCanceladoModal(Boolean(deal.cancelado));
+    setMotivoCancelacionModal(deal.motivoCancelacion || '');
+    setMostrarCampoCancelacion(false);
     setMensajeExitoDetallesModal(null);
   };
 
@@ -127,28 +162,69 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
     setGuardandoDetallesModal(true);
     setMensajeExitoDetallesModal(null);
     try {
-      await actualizarDetallesOportunidad(dealId, {
+      const montoNumerico = parseFloat(montoEditadoModal) || 0;
+      const marcasArray = marcasEditadasModal
+        .split(',')
+        .map((m) => m.trim())
+        .filter(Boolean);
+
+      const actualizacionOpo = {
+        titulo: tituloEditadoModal,
+        monto_estimado: montoNumerico,
+        modalidad_proyecto: modalidadEditadaModal,
+        tipo_evento: tipoEventoEditadoModal,
+        marcas_aliadas: marcasArray,
         fecha_cierre_esperada: fechaEditadaModal || undefined,
-        notas: notasEditadasModal
-      });
+        notas: notasEditadasModal,
+        cancelado: canceladoModal,
+        motivo_cancelacion: canceladoModal ? motivoCancelacionModal : undefined
+      };
+
+      await actualizarDetallesOportunidad(dealId, actualizacionOpo);
+
+      const updatesDeal: Partial<Deal> = {
+        title: tituloEditadoModal,
+        amount: montoNumerico,
+        projectModality: modalidadEditadaModal,
+        eventType: tipoEventoEditadoModal,
+        alliedBrands: marcasArray,
+        expectedCloseDate: fechaEditadaModal,
+        notes: notasEditadasModal,
+        cancelado: canceladoModal,
+        motivoCancelacion: canceladoModal ? motivoCancelacionModal : undefined
+      };
 
       if (onUpdateDealDetails) {
-        onUpdateDealDetails(dealId, {
-          expectedCloseDate: fechaEditadaModal,
-          notes: notasEditadasModal
-        });
+        onUpdateDealDetails(dealId, updatesDeal);
       }
 
       setDealDetalleSeleccionado((prev) =>
-        prev && prev.id === dealId
-          ? { ...prev, expectedCloseDate: fechaEditadaModal, notes: notasEditadasModal }
-          : prev
+        prev && prev.id === dealId ? { ...prev, ...updatesDeal } : prev
       );
 
+      setModoEdicionModal(false);
       setMensajeExitoDetallesModal('¡Detalles guardados exitosamente!');
       setTimeout(() => setMensajeExitoDetallesModal(null), 3500);
     } catch (error) {
       console.error('Error actualizando detalles de la oportunidad:', error);
+    } finally {
+      setGuardandoDetallesModal(false);
+    }
+  };
+
+  const handleEliminarDealModal = async (dealId: string) => {
+    if (!window.confirm('¿Confirmas que deseas eliminar definitivamente esta oportunidad comercial? Esta acción no se puede deshacer.')) {
+      return;
+    }
+    setGuardandoDetallesModal(true);
+    try {
+      await eliminarOportunidadEnBd(dealId);
+      if (onDeleteDeal) {
+        onDeleteDeal(dealId);
+      }
+      setDealDetalleSeleccionado(null);
+    } catch (error) {
+      console.error('Error al eliminar la oportunidad:', error);
     } finally {
       setGuardandoDetallesModal(false);
     }
@@ -216,41 +292,123 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
     return matchesSearch && matchesRep && matchesModality && matchesEventType;
   });
 
-  // Métricas globales del Pipeline (calculadas con tratos válidos vinculados a la cartera activa)
+  // Métricas globales del Pipeline (calculadas con tratos válidos y activos vinculados a la cartera)
   const dealsValidos: Deal[] = useMemo(() => {
     if (companies.length === 0) return deals;
     return deals.filter((d) => companyMap.has(d.companyId));
   }, [deals, companies, companyMap]);
 
-  const totalPipelineValue = dealsValidos.reduce((acc, d) => acc + d.amount, 0);
-  const weightedForecast = dealsValidos.reduce((acc, d) => acc + (d.amount * d.probability) / 100, 0);
-  const completedTotal = dealsValidos
+  const dealsActivos: Deal[] = useMemo(() => {
+    return dealsValidos.filter((d) => !d.cancelado);
+  }, [dealsValidos]);
+
+  const totalPipelineValue = dealsActivos.reduce((acc, d) => acc + d.amount, 0);
+  const weightedForecast = dealsActivos.reduce((acc, d) => acc + (d.amount * d.probability) / 100, 0);
+  const completedTotal = dealsActivos
     .filter((d) => d.stage === 'realizado' || d.stage === 'resultado')
     .reduce((acc, d) => acc + d.amount, 0);
   const totalAlumnosCaptados = dealsValidos.reduce((sum, d) => sum + (d.registeredLeadsCount || 0), 0);
 
-  const handleStageChange = async (dealId: string, currentStage: PipelineStage, targetStage: PipelineStage) => {
+  const handleStageChange = async (
+    dealId: string,
+    currentStage: PipelineStage,
+    targetStage: PipelineStage,
+    omitirValidaciones: boolean = false
+  ) => {
     const dealObjetivo = deals.find((d) => d.id === dealId);
     if (!dealObjetivo) return;
 
     setMensajeValidacion(null);
 
-    // Regla 1: Para mover a 'agendado': validar fecha asignada y modalidad definida (A o B)
-    if (targetStage === 'agendado') {
-      const tieneFecha = Boolean(dealObjetivo.expectedCloseDate && dealObjetivo.expectedCloseDate.trim() !== '');
-      const tieneModalidad =
-        dealObjetivo.projectModality === 'modalidad_a_programa' ||
-        dealObjetivo.projectModality === 'modalidad_b_escuela';
+    // Si no se omiten las validaciones (Stage Gates):
+    if (!omitirValidaciones) {
+      // 1. Avanzar a 'contacto': sugerir enlace o minuta
+      if (targetStage === 'contacto') {
+        const tieneContacto = Boolean(dealObjetivo.notes && dealObjetivo.notes.trim() !== '') ||
+          Boolean(companyMap.get(dealObjetivo.companyId)?.directorName);
+        if (!tieneContacto) {
+          setTransicionAdvertencia({
+            dealId,
+            currentStage,
+            targetStage,
+            titulo: 'Contacto Institucional Requerido',
+            motivo: `Para avanzar "${dealObjetivo.title}" a Contacto, es recomendable registrar al menos un enlace directivo o minuta de llamada.`
+          });
+          return;
+        }
+      }
 
-      if (!tieneFecha || !tieneModalidad) {
-        setMensajeValidacion(
-          `Requisito de Salida: Para agendar "${dealObjetivo.title}" es obligatorio contar con una fecha tentativa asignada y tener definida la modalidad del proyecto (Modalidad A o Modalidad B).`
-        );
-        return;
+      // 2. Avanzar a 'propuesta': requerir presupuesto comercial > 0
+      if (targetStage === 'propuesta') {
+        if (!dealObjetivo.amount || dealObjetivo.amount <= 0) {
+          setTransicionAdvertencia({
+            dealId,
+            currentStage,
+            targetStage,
+            titulo: 'Presupuesto Requerido',
+            motivo: `Para presentar una Propuesta formal es necesario definir el presupuesto estimado del convenio (actualmente $0 MXN).`
+          });
+          return;
+        }
+      }
+
+      // 3. Avanzar a 'agendado': requerir fecha tentativa y modalidad (A o B)
+      if (targetStage === 'agendado') {
+        const tieneFecha = Boolean(dealObjetivo.expectedCloseDate && dealObjetivo.expectedCloseDate.trim() !== '');
+        const tieneModalidad =
+          dealObjetivo.projectModality === 'modalidad_a_programa' ||
+          dealObjetivo.projectModality === 'modalidad_b_escuela';
+
+        if (!tieneFecha || !tieneModalidad) {
+          setTransicionAdvertencia({
+            dealId,
+            currentStage,
+            targetStage,
+            titulo: 'Fecha y Modalidad Requeridas',
+            motivo: `Para agendar la fecha en campus es obligatorio definir una fecha tentativa y la modalidad de proyecto (Modalidad A o Modalidad B).`
+          });
+          return;
+        }
+      }
+
+      // 4. Avanzar a 'realizado': advertencia si la fecha aún no llega
+      if (targetStage === 'realizado') {
+        if (dealObjetivo.expectedCloseDate) {
+          const fechaObj = new Date(dealObjetivo.expectedCloseDate);
+          const hoy = new Date();
+          hoy.setHours(0, 0, 0, 0);
+          if (fechaObj > hoy) {
+            setTransicionAdvertencia({
+              dealId,
+              currentStage,
+              targetStage,
+              titulo: 'Confirmación de Ejecución en Campo',
+              motivo: `La fecha agendada (${dealObjetivo.expectedCloseDate}) es posterior al día de hoy. Confirma si el evento o recorrido ya fue efectuado en el campus.`
+            });
+            return;
+          }
+        }
+      }
+
+      // 5. Avanzar a 'resultado': verificar captura de prospectos vía QR o firma de convenio
+      if (targetStage === 'resultado') {
+        const alumnos = dealObjetivo.registeredLeadsCount || 0;
+        if (alumnos === 0) {
+          setTransicionAdvertencia({
+            dealId,
+            currentStage,
+            targetStage,
+            titulo: 'Verificación de Resultados & Leads',
+            motivo: `Esta iniciativa aún no registra alumnos captados vía QR. Para registrar Resultado exitoso se recomienda haber recibido alumnos o confirmar formalmente el convenio.`
+          });
+          return;
+        }
       }
     }
 
-    // Regla 2: Para mover a 'resultado': verificar número de alumnos registrados y celebrar
+    setTransicionAdvertencia(null);
+
+    // Celebración con confetti si se concreta la etapa 'resultado'
     if (targetStage === 'resultado') {
       const alumnos = dealObjetivo.registeredLeadsCount || 0;
 
@@ -276,7 +434,7 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
       console.warn('Error actualizando etapa en el servicio central:', err)
     );
 
-    // Regla 3: Registrar automáticamente actividad en la bitácora del CRM con el cambio de etapa
+    // Registro automático de actividad en la bitácora
     if (onAddActivity) {
       const descripcion =
         targetStage === 'agendado'
@@ -365,7 +523,71 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
         </button>
       </div>
 
-      {/* BANNER DE ERROR DE VALIDACIÓN DE SALIDA (REQUISITOS AGENDADO/RESULTADO) */}
+      {/* BANNER / DIÁLOGO INTERACTIVO DE CRITERIOS DE ETAPA (STAGE GATES) */}
+      {transicionAdvertencia && (
+        <div className="p-4 sm:p-5 rounded-2xl bg-amber-50 border-2 border-amber-300 text-amber-950 text-xs shadow-develop-box animate-fadeIn flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-700 flex items-center justify-center shrink-0 border border-amber-300">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 tracking-wider">
+                  Criterio de Etapa
+                </span>
+                <strong className="font-bold text-sm text-amber-950">
+                  {transicionAdvertencia.titulo}
+                </strong>
+              </div>
+              <p className="text-xs text-amber-900/90 mt-1 max-w-2xl leading-relaxed">
+                {transicionAdvertencia.motivo}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0 w-full md:w-auto justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                const dealObj = deals.find((d) => d.id === transicionAdvertencia.dealId);
+                if (dealObj) abrirExpedienteDeal(dealObj);
+                setTransicionAdvertencia(null);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-white text-slate-800 border border-slate-300 hover:bg-slate-50 font-bold text-xs transition-colors cursor-pointer"
+            >
+              Completar Datos
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                handleStageChange(
+                  transicionAdvertencia.dealId,
+                  transicionAdvertencia.currentStage,
+                  transicionAdvertencia.targetStage,
+                  true
+                );
+              }}
+              className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-[#29008e] to-[#640354] text-white hover:brightness-110 font-bold text-xs shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+              title="Permite omitir la regla de negocio para pruebas de MVP o usuario directivo"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-[#a78bfa]" />
+              <span>Avanzar de todos modos {esSuperusuario ? '(Superusuario)' : ''}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setTransicionAdvertencia(null)}
+              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-black/5"
+              title="Cancelar"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* BANNER DE ERROR DE VALIDACIÓN DE SALIDA (COMPATIBILIDAD) */}
       {mensajeValidacion && (
         <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium flex items-start justify-between gap-3 shadow-xs animate-shake">
           <div className="flex items-start gap-2.5">
@@ -644,10 +866,27 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                     <div
                       key={deal.id}
                       onClick={() => abrirExpedienteDeal(deal)}
-                      className="card-light card-light-hover p-4 text-left group rounded-[18px] flex flex-col justify-between h-[395px] cursor-pointer"
+                      className={`card-light card-light-hover p-4 text-left group rounded-[18px] flex flex-col justify-between h-[395px] cursor-pointer ${
+                        deal.cancelado ? 'opacity-75 bg-slate-50/80 border-dashed border-red-200' : ''
+                      }`}
                     >
                       {/* Contenido Superior de la Tarjeta */}
                       <div className="space-y-2">
+                        {/* Indicador de Descarte / Cancelado si aplica */}
+                        {deal.cancelado && (
+                          <div className="text-[9px] bg-red-100/90 text-red-700 px-2 py-0.5 rounded-md font-bold flex items-center justify-between border border-red-200 shrink-0">
+                            <span className="truncate flex items-center gap-1">
+                              <Ban className="w-2.5 h-2.5 text-red-600 shrink-0" />
+                              <span>Cancelado</span>
+                            </span>
+                            {deal.motivoCancelacion && (
+                              <span className="text-[8px] font-normal truncate max-w-[90px]" title={deal.motivoCancelacion}>
+                                {deal.motivoCancelacion}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
                         {/* Encabezado institucional: Universidad con tooltip/truncate + Lead Score */}
                         <div className="flex items-start justify-between gap-1">
                           <span
@@ -1242,115 +1481,307 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setDealDetalleSeleccionado(null)}
-                    className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors shrink-0 cursor-pointer"
-                    title="Cerrar expediente"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setModoEdicionModal(!modoEdicionModal)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                        modoEdicionModal
+                          ? 'bg-amber-400 text-[#07052e]'
+                          : 'bg-white/10 hover:bg-white/20 text-white'
+                      }`}
+                      title="Editar título, presupuesto, modalidad o evento de esta oportunidad"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>{modoEdicionModal ? 'Cancelar Edición' : 'Editar Datos'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setDealDetalleSeleccionado(null)}
+                      className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+                      title="Cerrar expediente"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
 
               {/* Cuerpo con Scroll */}
               <div className="p-5 sm:p-6 space-y-5 overflow-y-auto bg-white flex-1">
-                {/* Cuadrícula de Métricas Financieras (4 columnas en grid) */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="card-light p-3.5 rounded-2xl border border-black/5 space-y-0.5">
-                    <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">
-                      Presupuesto Total
-                    </span>
-                    <div className="text-sm sm:text-base font-extrabold text-[#111111] truncate">
-                      ${dealActual.amount.toLocaleString('es-MX')} MXN
-                    </div>
-                  </div>
-
-                  <div className="card-light p-3.5 rounded-2xl border border-black/5 space-y-0.5">
-                    <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">
-                      Probabilidad
-                    </span>
-                    <div className="text-sm sm:text-base font-extrabold text-[#29008e]">
-                      {dealActual.probability}%
-                    </div>
-                  </div>
-
-                  <div className="card-light p-3.5 rounded-2xl border border-black/5 space-y-0.5">
-                    <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block" title="Valor esperado para flujo de caja">
-                      Pronóstico Ponderado
-                    </span>
-                    <div className="text-sm sm:text-base font-extrabold text-emerald-700 truncate">
-                      ${pronosticoForecast.toLocaleString('es-MX')} MXN
-                    </div>
-                    <span className="text-[9px] text-[#888888] block">Valor esperado para flujo de caja</span>
-                  </div>
-
-                  <div className="card-light p-3.5 rounded-2xl border border-black/5 space-y-0.5">
-                    <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">
-                      Talento Capturado
-                    </span>
-                    <div className="text-sm sm:text-base font-extrabold text-[#640354]">
-                      {dealActual.registeredLeadsCount || 0} alumnos
-                    </div>
-                  </div>
-                </div>
-
-                {/* Detalles de Clasificación (grid 2 columnas) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div className="p-3 bg-[#F8F8FC] rounded-2xl border border-black/5 space-y-1">
-                    <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">Modalidad</span>
-                    <div className="font-bold text-[#111111] flex items-center gap-1.5">
-                      <Layers className="w-3.5 h-3.5 text-[#29008e]" />
-                      <span>
-                        {dealActual.projectModality === 'modalidad_a_programa'
-                          ? 'Modalidad A (Programa Develop)'
-                          : 'Modalidad B (Alojado Escuela)'}
+                {/* Cuadrícula de Información / Edición */}
+                {modoEdicionModal ? (
+                  <div className="bg-[#0f094f]/[0.03] border border-[#0f094f]/15 rounded-2xl p-4 space-y-3.5 animate-fadeIn">
+                    <div className="flex items-center justify-between pb-2 border-b border-black/5">
+                      <span className="text-xs font-bold text-[#0f094f] uppercase tracking-wider flex items-center gap-1.5">
+                        <Edit3 className="w-3.5 h-3.5 text-[#29008e]" />
+                        <span>Edición de Información General</span>
                       </span>
+                      <span className="text-[10px] text-[#888888]">Modo Edición</span>
                     </div>
-                  </div>
 
-                  <div className="p-3 bg-[#F8F8FC] rounded-2xl border border-black/5 space-y-1">
-                    <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">Tipo de Evento</span>
-                    <div className="font-bold text-[#111111] flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-[#640354]" />
-                      <span className="capitalize">{dealActual.eventType.replace('_', ' ')}</span>
-                    </div>
-                  </div>
-
-                  <div className="p-3 bg-[#F8F8FC] rounded-2xl border border-black/5 space-y-1">
-                    <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">Asesor Responsable</span>
-                    <div className="font-bold text-[#111111] flex items-center gap-1.5">
-                      <User className="w-3.5 h-3.5 text-[#888888]" />
-                      <span>{dealActual.assignedRep}</span>
-                    </div>
-                  </div>
-
-                  <div className="p-3 bg-[#F8F8FC] rounded-2xl border border-black/5 space-y-1.5">
-                    <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">
-                      Fecha Programada / Cierre
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-3.5 h-3.5 text-[#29008e] shrink-0" />
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">
+                        Título de la Oportunidad
+                      </label>
                       <input
-                        type="date"
-                        value={fechaEditadaModal}
-                        onChange={(e) => setFechaEditadaModal(e.target.value)}
-                        className="bg-white border border-black/10 rounded-xl px-2.5 py-1 text-xs font-bold text-[#0f094f] w-full focus:outline-none focus:border-[#29008e]"
+                        type="text"
+                        value={tituloEditadoModal}
+                        onChange={(e) => setTituloEditadoModal(e.target.value)}
+                        className="input-develop w-full text-xs font-bold text-[#111111]"
+                        placeholder="Título de la oportunidad..."
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">
+                          Presupuesto Estimado ($ MXN)
+                        </label>
+                        <input
+                          type="number"
+                          value={montoEditadoModal}
+                          onChange={(e) => setMontoEditadoModal(e.target.value)}
+                          className="input-develop w-full text-xs font-bold text-[#111111]"
+                          placeholder="140000"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">
+                          Modalidad del Proyecto
+                        </label>
+                        <select
+                          value={modalidadEditadaModal}
+                          onChange={(e) => setModalidadEditadaModal(e.target.value as ProjectModality)}
+                          className="input-develop w-full text-xs font-medium text-[#111111]"
+                        >
+                          <option value="modalidad_a_programa">Modalidad A (Programa Develop)</option>
+                          <option value="modalidad_b_escuela">Modalidad B (Alojado en la Escuela)</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">
+                          Tipo de Evento
+                        </label>
+                        <select
+                          value={tipoEventoEditadoModal}
+                          onChange={(e) => setTipoEventoEditadoModal(e.target.value as EventType)}
+                          className="input-develop w-full text-xs font-medium text-[#111111]"
+                        >
+                          <option value="hackathon">Hackathon</option>
+                          <option value="feria_trabajo">Feria de Trabajo</option>
+                          <option value="conferencia_taller">Conferencia / Taller</option>
+                          <option value="recorrido_comercial">Recorrido Comercial</option>
+                          <option value="proyecto">Proyecto Especial</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">
+                          Fecha Programada / Cierre
+                        </label>
+                        <input
+                          type="date"
+                          value={fechaEditadaModal}
+                          onChange={(e) => setFechaEditadaModal(e.target.value)}
+                          className="input-develop w-full text-xs font-bold text-[#0f094f]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">
+                        Marcas Patrocinadoras (separadas por coma)
+                      </label>
+                      <input
+                        type="text"
+                        value={marcasEditadasModal}
+                        onChange={(e) => setMarcasEditadasModal(e.target.value)}
+                        className="input-develop w-full text-xs text-[#111111]"
+                        placeholder="AWS, Microsoft, Google Cloud"
                       />
                     </div>
                   </div>
+                ) : (
+                  <>
+                    {/* Cuadrícula de Métricas Financieras (4 columnas en grid) */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="card-light p-3.5 rounded-2xl border border-black/5 space-y-0.5">
+                        <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">
+                          Presupuesto Total
+                        </span>
+                        <div className="text-sm sm:text-base font-extrabold text-[#111111] truncate">
+                          ${dealActual.amount.toLocaleString('es-MX')} MXN
+                        </div>
+                      </div>
 
-                  <div className="sm:col-span-2 p-3 bg-[#F8F8FC] rounded-2xl border border-black/5 space-y-1">
-                    <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">Marcas Patrocinadoras</span>
-                    <div className="font-medium text-[#111111] flex items-center gap-1.5">
-                      <Flag className="w-3.5 h-3.5 text-[#29008e]" />
-                      <span>
-                        {dealActual.alliedBrands && dealActual.alliedBrands.length > 0
-                          ? dealActual.alliedBrands.join(', ')
-                          : 'Sin patrocinadores asignados'}
-                      </span>
+                      <div className="card-light p-3.5 rounded-2xl border border-black/5 space-y-0.5">
+                        <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">
+                          Probabilidad
+                        </span>
+                        <div className="text-sm sm:text-base font-extrabold text-[#29008e]">
+                          {dealActual.probability}%
+                        </div>
+                      </div>
+
+                      <div className="card-light p-3.5 rounded-2xl border border-black/5 space-y-0.5">
+                        <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block" title="Valor esperado para flujo de caja">
+                          Pronóstico Ponderado
+                        </span>
+                        <div className="text-sm sm:text-base font-extrabold text-emerald-700 truncate">
+                          ${pronosticoForecast.toLocaleString('es-MX')} MXN
+                        </div>
+                        <span className="text-[9px] text-[#888888] block">Valor esperado para flujo de caja</span>
+                      </div>
+
+                      <div className="card-light p-3.5 rounded-2xl border border-black/5 space-y-0.5">
+                        <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">
+                          Talento Capturado
+                        </span>
+                        <div className="text-sm sm:text-base font-extrabold text-[#640354]">
+                          {dealActual.registeredLeadsCount || 0} alumnos
+                        </div>
+                      </div>
                     </div>
-                  </div>
+
+                    {/* Detalles de Clasificación (grid 2 columnas) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      <div className="p-3 bg-[#F8F8FC] rounded-2xl border border-black/5 space-y-1">
+                        <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">Modalidad</span>
+                        <div className="font-bold text-[#111111] flex items-center gap-1.5">
+                          <Layers className="w-3.5 h-3.5 text-[#29008e]" />
+                          <span>
+                            {dealActual.projectModality === 'modalidad_a_programa'
+                              ? 'Modalidad A (Programa Develop)'
+                              : 'Modalidad B (Alojado Escuela)'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-[#F8F8FC] rounded-2xl border border-black/5 space-y-1">
+                        <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">Tipo de Evento</span>
+                        <div className="font-bold text-[#111111] flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-[#640354]" />
+                          <span className="capitalize">{dealActual.eventType.replace('_', ' ')}</span>
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-[#F8F8FC] rounded-2xl border border-black/5 space-y-1">
+                        <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">Asesor Responsable</span>
+                        <div className="font-bold text-[#111111] flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5 text-[#888888]" />
+                          <span>{dealActual.assignedRep}</span>
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-[#F8F8FC] rounded-2xl border border-black/5 space-y-1.5">
+                        <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">
+                          Fecha Programada / Cierre
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-3.5 h-3.5 text-[#29008e] shrink-0" />
+                          <input
+                            type="date"
+                            value={fechaEditadaModal}
+                            onChange={(e) => setFechaEditadaModal(e.target.value)}
+                            className="bg-white border border-black/10 rounded-xl px-2.5 py-1 text-xs font-bold text-[#0f094f] w-full focus:outline-none focus:border-[#29008e]"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="sm:col-span-2 p-3 bg-[#F8F8FC] rounded-2xl border border-black/5 space-y-1">
+                        <span className="text-[10px] font-bold text-[#888888] uppercase tracking-wider block">Marcas Patrocinadoras</span>
+                        <div className="font-medium text-[#111111] flex items-center gap-1.5">
+                          <Flag className="w-3.5 h-3.5 text-[#29008e]" />
+                          <span>
+                            {dealActual.alliedBrands && dealActual.alliedBrands.length > 0
+                              ? dealActual.alliedBrands.join(', ')
+                              : 'Sin patrocinadores asignados'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Gestión de Cancelación / Descarte (Closed-Lost) */}
+                <div className="bg-[#F8F8FC] p-3.5 rounded-2xl border border-black/5">
+                  {canceladoModal ? (
+                    <div className="bg-red-50 border border-red-200/80 p-3 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-start gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-red-100 text-red-700 flex items-center justify-center shrink-0">
+                          <Ban className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h5 className="text-xs font-bold text-red-900 leading-tight">Oportunidad Marcada como Cancelada (Closed-Lost)</h5>
+                          <p className="text-[11px] text-red-700 mt-0.5 leading-snug">
+                            Motivo: <strong>{motivoCancelacionModal || 'Sin motivo registrado'}</strong>
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCanceladoModal(false);
+                          setMotivoCancelacionModal('');
+                          setMostrarCampoCancelacion(false);
+                        }}
+                        className="btn-secondary-develop text-[11px] px-3 py-1.5 font-bold flex items-center gap-1.5 shrink-0 cursor-pointer"
+                      >
+                        <RotateCcw className="w-3 h-3 text-[#29008e]" />
+                        <span>Reactivar Oportunidad</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      {!mostrarCampoCancelacion ? (
+                        <button
+                          type="button"
+                          onClick={() => setMostrarCampoCancelacion(true)}
+                          className="text-[11px] font-semibold text-[#888888] hover:text-red-600 transition-colors flex items-center gap-1.5 py-1 cursor-pointer"
+                        >
+                          <Ban className="w-3.5 h-3.5 text-red-500" />
+                          <span>Marcar esta oportunidad como Cancelada / Descartada (Closed-Lost)</span>
+                        </button>
+                      ) : (
+                        <div className="bg-amber-50/60 border border-amber-200/80 p-3 rounded-xl space-y-2.5 animate-fadeIn">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-bold text-amber-900">Motivo de Cancelación / Descarte:</span>
+                            <button
+                              type="button"
+                              onClick={() => setMostrarCampoCancelacion(false)}
+                              className="text-[10px] text-[#888888] hover:text-[#111111] cursor-pointer"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                          <input
+                            type="text"
+                            value={motivoCancelacionModal}
+                            onChange={(e) => setMotivoCancelacionModal(e.target.value)}
+                            placeholder="Ej. Presupuesto no aprobado por rectoría, saturación de calendario escolar..."
+                            className="input-develop w-full text-xs bg-white"
+                          />
+                          <div className="flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCanceladoModal(true);
+                                setMostrarCampoCancelacion(false);
+                              }}
+                              className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <Ban className="w-3 h-3" />
+                              <span>Confirmar Descarte</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Notas Completas de la Negociación (Editables con persistencia) */}
@@ -1363,15 +1794,15 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                       type="button"
                       disabled={guardandoDetallesModal}
                       onClick={() => handleGuardarDetallesDeal(dealActual.id)}
-                      className="px-2.5 py-1 rounded-xl bg-[#0f094f] hover:bg-[#29008e] text-white text-[11px] font-bold transition-all flex items-center gap-1 shadow-xs cursor-pointer disabled:opacity-50"
-                      title="Guardar cambios de fecha y notas en el CRM"
+                      className="px-3 py-1.5 rounded-xl bg-[#0f094f] hover:bg-[#29008e] text-white text-[11px] font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+                      title="Guardar todos los cambios en el CRM"
                     >
                       {guardandoDetallesModal ? (
                         <Loader2 className="w-3 h-3 animate-spin" />
                       ) : (
                         <Check className="w-3 h-3 text-[#a78bfa]" />
                       )}
-                      <span>Guardar Acuerdos</span>
+                      <span>Guardar Cambios</span>
                     </button>
                   </div>
                   <textarea
@@ -1447,13 +1878,28 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                   </button>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setDealDetalleSeleccionado(null)}
-                  className="btn-secondary-develop px-4 py-2 text-xs font-bold cursor-pointer"
-                >
-                  Cerrar Expediente
-                </button>
+                <div className="flex items-center gap-2">
+                  {esSuperusuario && (
+                    <button
+                      type="button"
+                      disabled={guardandoDetallesModal}
+                      onClick={() => handleEliminarDealModal(dealActual.id)}
+                      className="btn-danger-develop px-3.5 py-2 text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      title="Eliminar definitivamente este trato de la base de datos (Modo Superusuario)"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Eliminar (Superusuario)</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setDealDetalleSeleccionado(null)}
+                    className="btn-secondary-develop px-4 py-2 text-xs font-bold cursor-pointer"
+                  >
+                    Cerrar Expediente
+                  </button>
+                </div>
               </div>
             </div>
           </div>

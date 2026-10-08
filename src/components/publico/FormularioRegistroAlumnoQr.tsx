@@ -29,6 +29,7 @@ interface PropiedadesFormularioRegistroAlumnoQr {
   universidadId: string;
   nombreUniversidad?: string;
   tituloEvento?: string;
+  carrerasSugeridas?: string[];
   alRegistrarExitoso?: (alumno: {
     nombre_completo: string;
     correo_electronico: string;
@@ -56,15 +57,29 @@ export const FormularioRegistroAlumnoQr: React.FC<PropiedadesFormularioRegistroA
   universidadId,
   nombreUniversidad = 'Universidad Aliada Develop',
   tituloEvento = 'Feria de Talento & Vinculación Tech',
+  carrerasSugeridas,
   alRegistrarExitoso,
   alCerrarVista,
   esModal = false
 }) => {
+  const listaCarreras = React.useMemo(() => {
+    if (carrerasSugeridas && carrerasSugeridas.length > 0) {
+      const unicas = Array.from(new Set(carrerasSugeridas));
+      return [...unicas, 'Otra carrera afín a tecnología'];
+    }
+    return CARRERAS_COMUNES;
+  }, [carrerasSugeridas]);
+
   // Estados del formulario
   const [nombreCompleto, setNombreCompleto] = useState('');
   const [correoElectronico, setCorreoElectronico] = useState('');
   const [telefonoWhatsApp, setTelefonoWhatsApp] = useState('');
-  const [carreraSeleccionada, setCarreraSeleccionada] = useState(CARRERAS_COMUNES[0]);
+  const [carreraSeleccionada, setCarreraSeleccionada] = useState(() => {
+    if (carrerasSugeridas && carrerasSugeridas.length > 0) {
+      return carrerasSugeridas[0];
+    }
+    return CARRERAS_COMUNES[0];
+  });
   const [otraCarreraTexto, setOtraCarreraTexto] = useState('');
   const [semestreActual, setSemestreActual] = useState('6');
   const [avisoPrivacidadAceptado, setAvisoPrivacidadAceptado] = useState(false);
@@ -326,7 +341,7 @@ export const FormularioRegistroAlumnoQr: React.FC<PropiedadesFormularioRegistroA
                       onChange={(e) => setCarreraSeleccionada(e.target.value)}
                       className="input-develop input-develop-con-icono w-full pr-3 text-xs font-medium cursor-pointer"
                     >
-                      {CARRERAS_COMUNES.map((c) => (
+                      {listaCarreras.map((c) => (
                         <option key={c} value={c}>
                           {c}
                         </option>

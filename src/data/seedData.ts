@@ -20,7 +20,15 @@ export const SEED_COMPANIES: Company[] = [
     status: 'en_seguimiento',
     tags: ['Ingenierías', 'Residencias Profesionales', 'Modalidad Dual'],
     preferredModality: 'modalidad_a_programa',
-    alliedBrands: ['AWS', 'Cisco']
+    alliedBrands: ['AWS', 'Cisco'],
+    datos_adicionales: {
+      carreras: [
+        'Ingeniería en Tecnologías de la Información',
+        'Ingeniería en Sistemas Computacionales',
+        'Ingeniería Mecatrónica',
+        'Ingeniería Industrial'
+      ]
+    }
   },
   {
     id: 'school-mex-2',
@@ -40,7 +48,15 @@ export const SEED_COMPANIES: Company[] = [
     status: 'cliente_activo',
     tags: ['Convenio Firmado', 'Hackathon Anual', 'TODO Academy'],
     preferredModality: 'modalidad_a_programa',
-    alliedBrands: ['Microsoft', 'Google Cloud']
+    alliedBrands: ['Microsoft', 'Google Cloud'],
+    datos_adicionales: {
+      carreras: [
+        'Ingeniería en Software y Redes',
+        'Ingeniería Mecatrónica',
+        'Ingeniería en Telecomunicaciones y Sistemas',
+        'Licenciatura en Ciencias de Datos'
+      ]
+    }
   },
   {
     id: 'school-mex-3',
@@ -60,7 +76,15 @@ export const SEED_COMPANIES: Company[] = [
     status: 'en_seguimiento',
     tags: ['Estadías Cuatrimestrales', 'Feria de Empleo', 'TODO Academy'],
     preferredModality: 'modalidad_b_escuela',
-    alliedBrands: ['Intel', 'AWS']
+    alliedBrands: ['Intel', 'AWS'],
+    datos_adicionales: {
+      carreras: [
+        'TSU en Tecnologías de la Información (Desarrollo de Software)',
+        'Ingeniería en Redes y Ciberseguridad',
+        'TSU en Mecatrónica',
+        'Ingeniería en Procesos Industriales'
+      ]
+    }
   },
   {
     id: 'school-mex-4',
@@ -388,6 +412,28 @@ export const SEED_ACTIVITIES: Activity[] = [
     description: 'Se remitió documentación justificando que la universidad no requiere licitar y que PluriOne lidera el desarrollo.',
     date: '2026-09-19 10:15',
     completed: true,
+    author: 'Carlos Mendoza'
+  },
+  {
+    id: 'act-4',
+    dealId: 'deal-2',
+    companyId: 'school-mex-2',
+    type: 'call',
+    title: 'Llamada de confirmación de stand de feria con Dra. Mónica Estrada',
+    description: 'Confirmar medidas del stand (3x2m), requerimiento de toma eléctrica y pase vehicular para promotores.',
+    date: '2026-10-12 10:00',
+    completed: false,
+    author: 'Carlos Mendoza'
+  },
+  {
+    id: 'act-5',
+    dealId: 'deal-6',
+    companyId: 'school-mex-5',
+    type: 'meeting',
+    title: 'Presentación ejecutiva a Dirección de Ingeniería en Anáhuac',
+    description: 'Sesión presencial para detallar los beneficios curriculares del Talent Program y entrega de minuta con Google Cloud.',
+    date: '2026-10-15 12:00',
+    completed: false,
     author: 'Carlos Mendoza'
   }
 ];

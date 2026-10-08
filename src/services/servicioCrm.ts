@@ -164,7 +164,9 @@ export function mapearOportunidadADeal(op: Oportunidad): Deal {
     projectModality: op.modalidad_proyecto,
     eventType: op.tipo_evento,
     alliedBrands: op.marcas_aliadas || [],
-    registeredLeadsCount: op.contador_alumnos_registrados || 0
+    registeredLeadsCount: op.contador_alumnos_registrados || 0,
+    cancelado: Boolean(op.datos_adicionales && (op.datos_adicionales as any).cancelado),
+    motivoCancelacion: (op.datos_adicionales && (op.datos_adicionales as any).motivo_cancelacion) || undefined
   };
 }
 
@@ -190,7 +192,10 @@ export function mapearDealAOportunidad(
     contador_alumnos_registrados: deal.registeredLeadsCount || 0,
     notas: deal.notes || null,
     ultimo_cambio_etapa: deal.lastStageChange || new Date().toISOString(),
-    datos_adicionales: {}
+    datos_adicionales: {
+      cancelado: Boolean(deal.cancelado),
+      motivo_cancelacion: deal.motivoCancelacion || null
+    }
   };
 }
 
@@ -518,6 +523,9 @@ export async function actualizarUniversidadEnBD(
   }
   if (cambios.tipo !== undefined || cambios.type !== undefined) {
     camposSql.tipo = cambios.tipo || cambios.type;
+  }
+  if (cambios.datos_adicionales !== undefined) {
+    camposSql.datos_adicionales = cambios.datos_adicionales;
   }
 
   try {
@@ -948,13 +956,20 @@ export async function actualizarEtapaOportunidad(
 }
 
 /**
- * Actualiza detalles clave de una oportunidad (fecha programada de cierre o notas de negociación).
+ * Actualiza los datos de una oportunidad (título, monto, modalidad, evento, marcas, fecha, notas, o cancelación).
  */
 export async function actualizarDetallesOportunidad(
   oportunidadId: string,
   detalles: {
+    titulo?: string;
+    monto_estimado?: number;
+    modalidad_proyecto?: 'modalidad_a_programa' | 'modalidad_b_escuela';
+    tipo_evento?: 'recorrido_comercial' | 'conferencia_taller' | 'feria_trabajo' | 'hackathon' | 'proyecto';
+    marcas_aliadas?: string[];
     fecha_cierre_esperada?: string;
     notas?: string;
+    cancelado?: boolean;
+    motivo_cancelacion?: string;
   }
 ): Promise<void> {
   const ahoraIso = new Date().toISOString();
@@ -965,11 +980,33 @@ export async function actualizarDetallesOportunidad(
 
     if (conexionDisponible) {
       const camposActualizar: OportunidadActualizacion = { actualizado_en: ahoraIso };
+      if (detalles.titulo !== undefined) {
+        camposActualizar.titulo = detalles.titulo;
+      }
+      if (detalles.monto_estimado !== undefined) {
+        camposActualizar.monto_estimado = detalles.monto_estimado;
+      }
+      if (detalles.modalidad_proyecto !== undefined) {
+        camposActualizar.modalidad_proyecto = detalles.modalidad_proyecto;
+      }
+      if (detalles.tipo_evento !== undefined) {
+        camposActualizar.tipo_evento = detalles.tipo_evento;
+      }
+      if (detalles.marcas_aliadas !== undefined) {
+        camposActualizar.marcas_aliadas = detalles.marcas_aliadas;
+      }
       if (detalles.fecha_cierre_esperada !== undefined) {
         camposActualizar.fecha_cierre_esperada = detalles.fecha_cierre_esperada;
       }
       if (detalles.notas !== undefined) {
         camposActualizar.notas = detalles.notas;
+      }
+      if (detalles.cancelado !== undefined || detalles.motivo_cancelacion !== undefined) {
+        camposActualizar.datos_adicionales = {
+          cancelado: detalles.cancelado ?? false,
+          motivo_cancelacion: detalles.motivo_cancelacion ?? null,
+          fecha_cancelacion: detalles.cancelado ? ahoraIso : null
+        };
       }
 
       await clienteSupabase
@@ -985,16 +1022,53 @@ export async function actualizarDetallesOportunidad(
   const listaLocal = obtenerOportunidadesRespaldo();
   const actualizada = listaLocal.map((opo) => {
     if (opo.id === oportunidadId) {
+      const datosAdicionalesActuales = (opo.datos_adicionales as Record<string, any>) || {};
+      const datosAdicionalesNuevos = {
+        ...datosAdicionalesActuales,
+        ...(detalles.cancelado !== undefined ? { cancelado: detalles.cancelado } : {}),
+        ...(detalles.motivo_cancelacion !== undefined ? { motivo_cancelacion: detalles.motivo_cancelacion } : {})
+      };
+
       return {
         ...opo,
+        ...(detalles.titulo !== undefined ? { titulo: detalles.titulo } : {}),
+        ...(detalles.monto_estimado !== undefined ? { monto_estimado: detalles.monto_estimado } : {}),
+        ...(detalles.modalidad_proyecto !== undefined ? { modalidad_proyecto: detalles.modalidad_proyecto } : {}),
+        ...(detalles.tipo_evento !== undefined ? { tipo_evento: detalles.tipo_evento } : {}),
+        ...(detalles.marcas_aliadas !== undefined ? { marcas_aliadas: detalles.marcas_aliadas } : {}),
         ...(detalles.fecha_cierre_esperada !== undefined ? { fecha_cierre_esperada: detalles.fecha_cierre_esperada } : {}),
         ...(detalles.notas !== undefined ? { notas: detalles.notas } : {}),
+        datos_adicionales: datosAdicionalesNuevos,
         actualizado_en: ahoraIso
       };
     }
     return opo;
   });
   guardarOportunidadesRespaldo(actualizada);
+}
+
+/**
+ * Elimina una oportunidad comercial tanto en Supabase PostgreSQL como en el almacenamiento local.
+ */
+export async function eliminarOportunidadEnBd(oportunidadId: string): Promise<boolean> {
+  // 1. Intentar eliminar en Supabase si está disponible
+  try {
+    const conexionDisponible = await verificarConexionSupabase();
+    if (conexionDisponible) {
+      await clienteSupabase
+        .from('oportunidades')
+        .delete()
+        .eq('id', oportunidadId);
+    }
+  } catch (error) {
+    console.warn('No se pudo eliminar oportunidad en Supabase:', error);
+  }
+
+  // 2. Eliminar en almacenamiento local de respaldo
+  const listaLocal = obtenerOportunidadesRespaldo();
+  const filtrada = listaLocal.filter((opo) => opo.id !== oportunidadId);
+  guardarOportunidadesRespaldo(filtrada);
+  return true;
 }
 
 /**

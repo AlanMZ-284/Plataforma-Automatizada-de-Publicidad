@@ -70,6 +70,8 @@ export interface Deal {
   eventType: EventType;
   alliedBrands: string[];
   registeredLeadsCount?: number;
+  cancelado?: boolean;
+  motivoCancelacion?: string;
 }
 
 export interface Activity {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   SEED_COMPANIES, 
   SEED_CONTACTS, 
@@ -43,7 +43,17 @@ import {
   CheckCircle2,
   AlertTriangle,
   HelpCircle,
-  LogOut
+  LogOut,
+  Calendar,
+  CheckSquare,
+  Clock,
+  Phone,
+  Mail,
+  Users,
+  FileText,
+  Check,
+  ChevronRight,
+  User
 } from 'lucide-react';
 
 type MainView = 'crm-pipeline' | 'crm-schools' | 'routes' | 'events-kit' | 'marketing' | 'analitica-roi' | 'registro-alumno-qr';
@@ -112,6 +122,22 @@ export function App() {
     titulo: string;
     mensaje: string;
   } | null>(null);
+  const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const mostrarToast = (
+    tipo: 'exito' | 'error' | 'info',
+    titulo: string,
+    mensaje: string,
+    duracionMs: number = 4500
+  ) => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setNotificacionToast({ tipo, titulo, mensaje });
+    toastTimerRef.current = setTimeout(() => {
+      setNotificacionToast(null);
+    }, duracionMs);
+  };
 
   // Estados de datos en memoria reactivos con persistencia resiliente
   const [companies, setCompanies] = useState<Company[]>(() => {
@@ -152,7 +178,20 @@ export function App() {
     return [];
   });
 
-  const [activities, setActivities] = useState<Activity[]>(SEED_ACTIVITIES);
+  const [activities, setActivities] = useState<Activity[]>(() => {
+    try {
+      const guardadas = localStorage.getItem('pap_crm_actividades_local');
+      if (guardadas !== null) {
+        const parsed = JSON.parse(guardadas);
+        if (Array.isArray(parsed)) {
+          return parsed;
+        }
+      }
+    } catch {}
+    return SEED_ACTIVITIES;
+  });
+  const [panelTareasAbierto, setPanelTareasAbierto] = useState(false);
+  const [filtroTareas, setFiltroTareas] = useState<'pendientes' | 'todas' | 'completadas'>('pendientes');
   const [campaigns, setCampaigns] = useState<Campaign[]>(SEED_CAMPAIGNS);
 
   // Estado para abrir ficha modal de escuela específica desde cualquier módulo
@@ -225,27 +264,30 @@ export function App() {
       const res = await poblarDatosSemillaEnSupabase();
       if (res.exito) {
         await sincronizarDatosDesdeBd();
-        setNotificacionToast({
-          tipo: 'exito',
-          titulo: 'Semilla Cargada en PostgreSQL',
-          mensaje: `Se cargaron ${res.totalUniversidades} instituciones, ${res.totalContactos} contactos y ${res.totalOportunidades} oportunidades en la base de datos oficial.`
-        });
+        setActivities(SEED_ACTIVITIES);
+        try {
+          localStorage.setItem('pap_crm_actividades_local', JSON.stringify(SEED_ACTIVITIES));
+        } catch {}
+        mostrarToast(
+          'exito',
+          'Catálogo Oficial Poblado',
+          `Se cargaron ${res.totalUniversidades} instituciones, ${res.totalContactos} contactos y ${res.totalOportunidades} oportunidades en PostgreSQL.`
+        );
       } else {
-        setNotificacionToast({
-          tipo: 'error',
-          titulo: 'Aviso de Carga',
-          mensaje: `No se pudieron cargar los datos semilla: ${res.error || 'Verifica la conexión'}`
-        });
+        mostrarToast(
+          'error',
+          'Aviso de Carga',
+          `No se pudieron cargar los datos semilla: ${res.error || 'Verifica la conexión'}`
+        );
       }
     } catch (e: any) {
-      setNotificacionToast({
-        tipo: 'error',
-        titulo: 'Error',
-        mensaje: `Fallo durante la carga semilla: ${e?.message || 'Error desconocido'}`
-      });
+      mostrarToast(
+        'error',
+        'Error',
+        `Fallo durante la carga semilla: ${e?.message || 'Error desconocido'}`
+      );
     } finally {
       setCargandoAccionBd(false);
-      setTimeout(() => setNotificacionToast(null), 6000);
     }
   };
 
@@ -258,23 +300,25 @@ export function App() {
       setDeals([]);
       setContacts([]);
       setActivities([]);
+      try {
+        localStorage.removeItem('pap_crm_actividades_local');
+      } catch {}
       setCampaigns([]);
       setEstadoBd((prev) => ({ ...prev, totalUniversidades: 0 }));
       setModalVaciarAbierto(false);
-      setNotificacionToast({
-        tipo: 'info',
-        titulo: 'Cartera Limpia',
-        mensaje: 'La base de datos y los respaldos locales se encuentran limpios en 0 para nuevas ingestas.'
-      });
+      mostrarToast(
+        'info',
+        'Cartera Reiniciada',
+        'La base de datos y los respaldos locales se encuentran limpios en 0 para nuevas ingestas.'
+      );
     } catch (e: any) {
-      setNotificacionToast({
-        tipo: 'error',
-        titulo: 'Error al Vaciar',
-        mensaje: `No fue posible vaciar la cartera: ${e?.message || 'Error desconocido'}`
-      });
+      mostrarToast(
+        'error',
+        'Error al Vaciar',
+        `No fue posible vaciar la cartera: ${e?.message || 'Error desconocido'}`
+      );
     } finally {
       setCargandoAccionBd(false);
-      setTimeout(() => setNotificacionToast(null), 6000);
     }
   };
 
@@ -359,12 +403,33 @@ export function App() {
       completed: true,
       author: newDeal.assignedRep
     });
+
+    mostrarToast(
+      'exito',
+      'Oportunidad Registrada',
+      `Se agregó "${newDeal.title}" con pronóstico de $${newDeal.amount.toLocaleString('es-MX')} MXN.`
+    );
   };
 
   // Actualizar detalles y notas de un trato / oportunidad
   const handleUpdateDealDetails = (dealId: string, updates: Partial<Deal>) => {
     setDeals((prev) =>
       prev.map((deal) => (deal.id === dealId ? { ...deal, ...updates } : deal))
+    );
+    mostrarToast(
+      'exito',
+      'Oportunidad Actualizada',
+      'Los acuerdos y detalles del trato han sido guardados con éxito.'
+    );
+  };
+
+  // Eliminar oportunidad definitivamente de la cartera
+  const handleDeleteDeal = (dealId: string) => {
+    setDeals((prev) => prev.filter((d) => d.id !== dealId));
+    mostrarToast(
+      'info',
+      'Oportunidad Eliminada',
+      'La oportunidad comercial ha sido eliminada definitivamente del CRM.'
     );
   };
 
@@ -374,13 +439,25 @@ export function App() {
       ...activityData,
       id: `act-${Date.now()}`
     };
-    setActivities((prev) => [newActivity, ...prev]);
+    setActivities((prev) => {
+      const actualizadas = [newActivity, ...prev];
+      try {
+        localStorage.setItem('pap_crm_actividades_local', JSON.stringify(actualizadas));
+      } catch {}
+      return actualizadas;
+    });
   };
 
   const handleToggleActivity = (activityId: string) => {
-    setActivities((prev) =>
-      prev.map((act) => (act.id === activityId ? { ...act, completed: !act.completed } : act))
-    );
+    setActivities((prev) => {
+      const actualizadas = prev.map((act) =>
+        act.id === activityId ? { ...act, completed: !act.completed } : act
+      );
+      try {
+        localStorage.setItem('pap_crm_actividades_local', JSON.stringify(actualizadas));
+      } catch {}
+      return actualizadas;
+    });
   };
 
   // Importar instituciones educativas desde Excel o CSV a la cartera activa
@@ -414,6 +491,12 @@ export function App() {
     } catch (e) {
       console.warn('Error sincronizando contador de universidades con Supabase:', e);
     }
+
+    mostrarToast(
+      'exito',
+      'Instituciones Importadas',
+      `Se incorporaron exitosamente ${newCompanies.length} instituciones a la cartera activa.`
+    );
   };
 
   // Registrar itinerario de ruta y viáticos en la agenda del CRM
@@ -439,6 +522,12 @@ export function App() {
         author: autorAsesor
       });
     });
+
+    mostrarToast(
+      'exito',
+      'Gira Comercial Agendada',
+      `Se integraron ${paradas.length} paradas y viáticos ($${totalViaticos} MXN) a la bitácora del CRM.`
+    );
   };
 
   // Actualizar contador de alumnos captados desde el Kit Comercial
@@ -836,6 +925,27 @@ export function App() {
               </button>
             </div>
 
+            {/* Botón de Centro de Agenda & Compromisos Globales */}
+            <div className="flex items-center pl-1 sm:pl-2 border-l border-black/5">
+              <button
+                onClick={() => setPanelTareasAbierto(true)}
+                title="Agenda consolidada de acuerdos, tareas y visitas en todas las instituciones"
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-all cursor-pointer ${
+                  panelTareasAbierto
+                    ? 'bg-[#29008e] text-white shadow-develop-glow'
+                    : 'bg-white hover:bg-[#07052e]/5 text-[#07052e] border border-black/10'
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5 text-[#29008e]" />
+                <span className="hidden md:inline">Agenda de Tareas</span>
+                {activities.filter((a) => !a.completed).length > 0 && (
+                  <span className="inline-flex items-center justify-center px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-[#f472b6] text-white leading-tight">
+                    {activities.filter((a) => !a.completed).length}
+                  </span>
+                )}
+              </button>
+            </div>
+
             {/* Ficha de Usuario en Topbar con acción de Cerrar Sesión */}
             <div className="flex items-center gap-2 pl-2 sm:border-l sm:border-black/5">
               <div className="text-right hidden md:block">
@@ -868,6 +978,8 @@ export function App() {
                 onUpdateDealStage={handleUpdateDealStage}
                 onAddDeal={handleAddDeal}
                 onUpdateDealDetails={handleUpdateDealDetails}
+                onDeleteDeal={handleDeleteDeal}
+                esSuperusuario={usuarioActivo.rol === 'superusuario'}
                 onSelectSchoolForCRM={handleOpenSchoolInCRM}
                 onOpenEventKit={handleOpenEventKit}
                 onAddActivity={handleAddActivity}
@@ -982,6 +1094,7 @@ export function App() {
                     universidadId={tratoActivo?.companyId || ''}
                     nombreUniversidad={universidadActiva?.name || 'Universidad Aliada'}
                     tituloEvento={tratoActivo?.title || 'Feria de Empleo & Talento'}
+                    carrerasSugeridas={Array.isArray(universidadActiva?.datos_adicionales?.carreras) ? universidadActiva.datos_adicionales.carreras : undefined}
                     alRegistrarExitoso={() => {
                       if (tratoActivo) {
                         handleUpdateDealLeads(tratoActivo.id, (tratoActivo.registeredLeadsCount || 0) + 1);
@@ -1068,6 +1181,7 @@ export function App() {
                 universidadId={tratoActivo?.companyId || ''}
                 nombreUniversidad={universidadActiva?.name || 'Universidad Aliada'}
                 tituloEvento={tratoActivo?.title || 'Feria de Empleo & Talento'}
+                carrerasSugeridas={Array.isArray(universidadActiva?.datos_adicionales?.carreras) ? universidadActiva.datos_adicionales.carreras : undefined}
                 esModal={true}
                 alRegistrarExitoso={() => {
                   if (tratoActivo) {
@@ -1139,38 +1253,306 @@ export function App() {
       )}
 
       {/* ============================================================== */}
+      {/* DRAWER LATERAL: CENTRO GLOBAL DE TAREAS Y COMPROMISOS CRM       */}
+      {/* ============================================================== */}
+      {panelTareasAbierto && (
+        <div className="fixed inset-0 z-50 overflow-hidden">
+          {/* Backdrop con Blur */}
+          <div
+            className="fixed inset-0 bg-[#07052e]/60 backdrop-blur-xs transition-opacity animate-fadeIn"
+            onClick={() => setPanelTareasAbierto(false)}
+          />
+
+          <div className="fixed inset-y-0 right-0 max-w-full flex pl-6 sm:pl-10">
+            <div className="w-screen max-w-md sm:max-w-lg bg-white shadow-develop-modal border-l border-black/10 flex flex-col animate-slideLeft">
+              {/* Cabecera del Panel */}
+              <div className="p-5 border-b border-black/10 bg-gradient-to-r from-[#07052e] via-[#0f094f] to-[#29008e] text-white">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 text-[#a78bfa]">
+                      <Calendar className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-extrabold tracking-tight text-white flex items-center gap-2">
+                        Agenda Global de Compromisos
+                      </h3>
+                      <p className="text-xs text-white/70">
+                        Bitácora consolidada de todas las instituciones educativas
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setPanelTareasAbierto(false)}
+                    className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-colors cursor-pointer"
+                    title="Cerrar panel de agenda"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Métricas rápidas */}
+                <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-white/10 text-center">
+                  <div className="p-2 rounded-xl bg-white/5 border border-white/10">
+                    <div className="text-[10px] uppercase font-bold text-white/60">Pendientes</div>
+                    <div className="text-lg font-black text-[#f472b6]">
+                      {activities.filter((a) => !a.completed).length}
+                    </div>
+                  </div>
+                  <div className="p-2 rounded-xl bg-white/5 border border-white/10">
+                    <div className="text-[10px] uppercase font-bold text-white/60">Realizadas</div>
+                    <div className="text-lg font-black text-emerald-400">
+                      {activities.filter((a) => a.completed).length}
+                    </div>
+                  </div>
+                  <div className="p-2 rounded-xl bg-white/5 border border-white/10">
+                    <div className="text-[10px] uppercase font-bold text-white/60">Total</div>
+                    <div className="text-lg font-black text-[#a78bfa]">
+                      {activities.length}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filtros de Pestaña */}
+              <div className="p-3 bg-slate-50 border-b border-black/5 flex items-center gap-2">
+                <button
+                  onClick={() => setFiltroTareas('pendientes')}
+                  className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all ${
+                    filtroTareas === 'pendientes'
+                      ? 'bg-[#29008e] text-white shadow-xs'
+                      : 'text-slate-600 hover:bg-slate-200/70'
+                  }`}
+                >
+                  Pendientes ({activities.filter((a) => !a.completed).length})
+                </button>
+                <button
+                  onClick={() => setFiltroTareas('todas')}
+                  className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all ${
+                    filtroTareas === 'todas'
+                      ? 'bg-[#29008e] text-white shadow-xs'
+                      : 'text-slate-600 hover:bg-slate-200/70'
+                  }`}
+                >
+                  Todas ({activities.length})
+                </button>
+                <button
+                  onClick={() => setFiltroTareas('completadas')}
+                  className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all ${
+                    filtroTareas === 'completadas'
+                      ? 'bg-[#29008e] text-white shadow-xs'
+                      : 'text-slate-600 hover:bg-slate-200/70'
+                  }`}
+                >
+                  Realizadas ({activities.filter((a) => a.completed).length})
+                </button>
+              </div>
+
+              {/* Listado de Actividades */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {(() => {
+                  const listaFiltrada = activities.filter((act) => {
+                    if (filtroTareas === 'pendientes') return !act.completed;
+                    if (filtroTareas === 'completadas') return act.completed;
+                    return true;
+                  });
+
+                  if (listaFiltrada.length === 0) {
+                    return (
+                      <div className="h-full flex flex-col items-center justify-center text-center p-8 text-slate-400">
+                        <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+                          <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+                        </div>
+                        <h4 className="text-sm font-bold text-slate-700">Sin tareas en esta vista</h4>
+                        <p className="text-xs text-slate-500 mt-1 max-w-xs">
+                          {filtroTareas === 'pendientes'
+                            ? 'Excelente trabajo: todos los compromisos agendados están al día.'
+                            : 'No se encontraron actividades registradas con el filtro seleccionado.'}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return listaFiltrada.map((act) => {
+                    const escuelaAsociada = companies.find((c) => c.id === act.companyId);
+                    
+                    // Helpers de Icono y Color según tipo
+                    let tipoBadge = {
+                      label: 'Tarea',
+                      bg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                      icon: CheckSquare
+                    };
+                    if (act.type === 'meeting') {
+                      tipoBadge = {
+                        label: 'Reunión / Visita',
+                        bg: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+                        icon: Users
+                      };
+                    } else if (act.type === 'call') {
+                      tipoBadge = {
+                        label: 'Llamada',
+                        bg: 'bg-blue-50 text-blue-700 border-blue-200',
+                        icon: Phone
+                      };
+                    } else if (act.type === 'email') {
+                      tipoBadge = {
+                        label: 'Correo',
+                        bg: 'bg-purple-50 text-purple-700 border-purple-200',
+                        icon: Mail
+                      };
+                    } else if (act.type === 'note') {
+                      tipoBadge = {
+                        label: 'Minuta / Nota',
+                        bg: 'bg-slate-100 text-slate-700 border-slate-200',
+                        icon: FileText
+                      };
+                    }
+
+                    const TipoIcon = tipoBadge.icon;
+
+                    return (
+                      <div
+                        key={act.id}
+                        className={`p-3.5 rounded-2xl border transition-all ${
+                          act.completed
+                            ? 'bg-slate-50/70 border-slate-200 opacity-75'
+                            : 'bg-white border-slate-200 hover:border-[#29008e]/40 shadow-xs'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          {/* Botón de toggle completado */}
+                          <button
+                            onClick={() => handleToggleActivity(act.id)}
+                            title={act.completed ? 'Marcar como pendiente' : 'Marcar como realizada'}
+                            className={`mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors cursor-pointer ${
+                              act.completed
+                                ? 'bg-emerald-500 text-white'
+                                : 'border-2 border-slate-300 hover:border-[#29008e] text-transparent hover:text-slate-300'
+                            }`}
+                          >
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                          </button>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${tipoBadge.bg}`}>
+                                <TipoIcon className="w-3 h-3" />
+                                {tipoBadge.label}
+                              </span>
+
+                              {act.date && (
+                                <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 font-medium">
+                                  <Clock className="w-3 h-3 text-slate-400" />
+                                  {act.date}
+                                </span>
+                              )}
+                            </div>
+
+                            <h5
+                              className={`text-xs font-bold leading-snug ${
+                                act.completed ? 'line-through text-slate-400' : 'text-[#111111]'
+                              }`}
+                            >
+                              {act.title}
+                            </h5>
+
+                            {act.description && (
+                              <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
+                                {act.description}
+                              </p>
+                            )}
+
+                            {/* Institución Asociada y Enlace a Expediente 360° */}
+                            <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#0f094f] truncate">
+                                <Building2 className="w-3.5 h-3.5 text-[#29008e] shrink-0" />
+                                <span className="truncate">{escuelaAsociada?.name || 'Institución no asignada'}</span>
+                              </div>
+
+                              {act.companyId && (
+                                <button
+                                  onClick={() => {
+                                    handleOpenSchoolInCRM(act.companyId);
+                                    setPanelTareasAbierto(false);
+                                  }}
+                                  className="inline-flex items-center gap-1 text-[10px] font-bold text-[#29008e] hover:text-[#640354] shrink-0 cursor-pointer"
+                                  title="Abrir expediente completo de la universidad"
+                                >
+                                  <span>Ver 360°</span>
+                                  <ChevronRight className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Asesor Responsable */}
+                            {act.author && (
+                              <div className="mt-1 text-[10px] text-slate-400 flex items-center gap-1">
+                                <User className="w-2.5 h-2.5" />
+                                <span>Responsable: {act.author}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+
+              {/* Pie de Panel con Acceso Directo al Directorio */}
+              <div className="p-3 bg-slate-50 border-t border-black/10 flex items-center justify-between gap-2">
+                <span className="text-[11px] text-slate-500">
+                  {activities.filter((a) => !a.completed).length} pendientes restantes
+                </span>
+                <button
+                  onClick={() => {
+                    setCurrentView('crm-schools');
+                    setPanelTareasAbierto(false);
+                  }}
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl bg-[#0f094f] text-white hover:bg-[#29008e] transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Building2 className="w-3.5 h-3.5" />
+                  <span>Ir al Directorio 360°</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
       {/* TOAST DE NOTIFICACIÓN FLOTANTE (ESTADOS DE BD / ACCIONES)      */}
       {/* ============================================================== */}
       {notificacionToast && (
-        <div className="fixed bottom-5 right-5 z-50 max-w-sm w-full p-4 rounded-2xl shadow-develop-modal border flex items-start gap-3 animate-slideUp bg-white text-[#111111] border-black/10">
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm w-full p-4 rounded-2xl border flex items-start gap-3.5 animate-slideUp bg-[#07052e] text-white border-white/15 shadow-[0_20px_50px_rgba(7,5,46,0.6)] backdrop-blur-xl">
           {notificacionToast.tipo === 'exito' && (
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-200">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30">
               <CheckCircle2 className="w-4 h-4" />
             </div>
           )}
           {notificacionToast.tipo === 'info' && (
-            <div className="w-8 h-8 rounded-xl bg-[#0f094f]/5 text-[#29008e] flex items-center justify-center shrink-0 border border-[#29008e]/20">
+            <div className="w-8 h-8 rounded-xl bg-[#29008e]/40 text-[#a78bfa] flex items-center justify-center shrink-0 border border-[#a78bfa]/30">
               <Database className="w-4 h-4" />
             </div>
           )}
           {notificacionToast.tipo === 'error' && (
-            <div className="w-8 h-8 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0 border border-red-200">
+            <div className="w-8 h-8 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center shrink-0 border border-red-500/30">
               <AlertTriangle className="w-4 h-4" />
             </div>
           )}
 
           <div className="flex-1 min-w-0">
-            <h4 className="text-xs font-bold text-[#111111] leading-tight">
+            <h4 className="text-xs font-bold text-white leading-tight">
               {notificacionToast.titulo}
             </h4>
-            <p className="text-[11px] text-[#555555] mt-0.5 leading-snug">
+            <p className="text-[11px] text-white/70 mt-0.5 leading-snug">
               {notificacionToast.mensaje}
             </p>
           </div>
 
           <button
             onClick={() => setNotificacionToast(null)}
-            className="text-[#888888] hover:text-[#111111] p-1 -mr-1 -mt-1 rounded-lg"
+            className="text-white/40 hover:text-white p-1 -mr-1 -mt-1 rounded-lg transition-colors"
+            title="Cerrar aviso"
           >
             <X className="w-3.5 h-3.5" />
           </button>
