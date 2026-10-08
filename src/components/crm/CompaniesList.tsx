@@ -497,7 +497,7 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
             placeholder="Buscar por universidad, municipio o rector..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="input-develop w-full pl-10 pr-4 text-xs"
+            className="input-develop input-develop-con-icono w-full pr-4 text-xs"
           />
         </div>
 
@@ -1353,7 +1353,7 @@ export const CompaniesList: React.FC<CompaniesListProps> = ({
                           placeholder="Buscar por nombre, carrera o correo..."
                           value={busquedaAlumnos}
                           onChange={(e) => setBusquedaAlumnos(e.target.value)}
-                          className="input-develop w-full pl-10 text-xs"
+                          className="input-develop input-develop-con-icono w-full text-xs"
                         />
                       </div>
                       {busquedaAlumnos && (

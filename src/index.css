@@ -239,42 +239,44 @@ body {
 }
 
 /* Formularios e Inputs (Guía §9) */
-.input-develop {
-  background: #F8F8FC;
-  border: 1px solid rgba(0, 0, 0, 0.10);
-  color: #111111;
-  border-radius: 12px;
-  padding: 0.75rem 1rem;
-  transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
-}
+@layer components {
+  .input-develop {
+    background: #F8F8FC;
+    border: 1px solid rgba(0, 0, 0, 0.10);
+    color: #111111;
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+  }
 
-/* Modificador para inputs y selectores con icono lateral izquierdo */
-.input-develop-con-icono {
-  padding-left: 2.75rem !important;
-}
+  /* Modificador para inputs y selectores con icono lateral izquierdo */
+  .input-develop-con-icono {
+    padding-left: 2.75rem !important;
+  }
 
-.input-develop:focus {
-  outline: none;
-  border-color: rgba(15, 9, 79, 0.30);
-  box-shadow: 0 0 0 2px rgba(15, 9, 79, 0.10);
-  transform: translateY(-1px);
-}
+  .input-develop:focus {
+    outline: none;
+    border-color: rgba(15, 9, 79, 0.30);
+    box-shadow: 0 0 0 2px rgba(15, 9, 79, 0.10);
+    transform: translateY(-1px);
+  }
 
-.input-develop-dark {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.075);
-  color: rgba(255, 255, 255, 0.88);
-  border-radius: 12px;
-  padding: 0.75rem 1rem;
-  transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
-}
+  .input-develop-dark {
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.075);
+    color: rgba(255, 255, 255, 0.88);
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+  }
 
-.input-develop-dark:focus {
-  outline: none;
-  border-color: rgba(167, 139, 250, 0.52);
-  background: rgba(255, 255, 255, 0.105);
-  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.13), 0 14px 34px rgba(0, 0, 0, 0.16);
-  transform: translateY(-1px);
+  .input-develop-dark:focus {
+    outline: none;
+    border-color: rgba(167, 139, 250, 0.52);
+    background: rgba(255, 255, 255, 0.105);
+    box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.13), 0 14px 34px rgba(0, 0, 0, 0.16);
+    transform: translateY(-1px);
+  }
 }
 
 /* Formulario Inmersivo / Premium (Guía §9) */

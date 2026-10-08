@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Deal, Company, PipelineStage, ProjectModality, EventType, Activity } from '../../types';
 import confetti from 'canvas-confetti';
 import { 
@@ -179,12 +179,31 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
   const [newEventType, setNewEventType] = useState<EventType>('hackathon');
   const [newAlliedBrands, setNewAlliedBrands] = useState('AWS, Microsoft');
   const [newNotes, setNewNotes] = useState('');
+  const [newCloseDate, setNewCloseDate] = useState(() => {
+    const hoy = new Date();
+    hoy.setDate(hoy.getDate() + 7);
+    return hoy.toISOString().split('T')[0];
+  });
+
+  const probabilidadSugerida = useMemo(() => {
+    switch (newStage) {
+      case 'prospecto': return 20;
+      case 'contacto': return 40;
+      case 'propuesta': return 60;
+      case 'agendado': return 80;
+      case 'realizado': return 95;
+      case 'resultado': return 100;
+      default: return 20;
+    }
+  }, [newStage]);
 
   const companyMap = new Map<string, Company>(companies.map((c) => [c.id, c]));
 
-  // Filtrado de tratos
+  // Filtrado de tratos: se omiten tratos huérfanos sin universidad vinculada cuando la cartera tiene escuelas
   const filteredDeals = deals.filter((deal) => {
     const comp = companyMap.get(deal.companyId);
+    if (companies.length > 0 && !comp) return false;
+
     const matchesSearch = 
       deal.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (comp && comp.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -197,13 +216,18 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
     return matchesSearch && matchesRep && matchesModality && matchesEventType;
   });
 
-  // Métricas globales del Pipeline
-  const totalPipelineValue = deals.reduce((acc, d) => acc + d.amount, 0);
-  const weightedForecast = deals.reduce((acc, d) => acc + (d.amount * d.probability) / 100, 0);
-  const completedTotal = deals
+  // Métricas globales del Pipeline (calculadas con tratos válidos vinculados a la cartera activa)
+  const dealsValidos: Deal[] = useMemo(() => {
+    if (companies.length === 0) return deals;
+    return deals.filter((d) => companyMap.has(d.companyId));
+  }, [deals, companies, companyMap]);
+
+  const totalPipelineValue = dealsValidos.reduce((acc, d) => acc + d.amount, 0);
+  const weightedForecast = dealsValidos.reduce((acc, d) => acc + (d.amount * d.probability) / 100, 0);
+  const completedTotal = dealsValidos
     .filter((d) => d.stage === 'realizado' || d.stage === 'resultado')
     .reduce((acc, d) => acc + d.amount, 0);
-  const totalAlumnosCaptados = deals.reduce((sum, d) => sum + (d.registeredLeadsCount || 0), 0);
+  const totalAlumnosCaptados = dealsValidos.reduce((sum, d) => sum + (d.registeredLeadsCount || 0), 0);
 
   const handleStageChange = async (dealId: string, currentStage: PipelineStage, targetStage: PipelineStage) => {
     const dealObjetivo = deals.find((d) => d.id === dealId);
@@ -284,16 +308,6 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
     e.preventDefault();
     if (!newTitle.trim()) return;
 
-    let probability = 20;
-    if (newStage === 'contacto') probability = 40;
-    if (newStage === 'propuesta') probability = 60;
-    if (newStage === 'agendado') probability = 80;
-    if (newStage === 'realizado') probability = 95;
-    if (newStage === 'resultado') probability = 100;
-
-    const futureDate = new Date();
-    futureDate.setDate(futureDate.getDate() + 30);
-
     const brandsArray = newAlliedBrands
       .split(',')
       .map((b) => b.trim())
@@ -304,8 +318,8 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
       companyId: newCompanyId,
       amount: parseFloat(newAmount) || 50000,
       stage: newStage,
-      probability,
-      expectedCloseDate: futureDate.toISOString().split('T')[0],
+      probability: probabilidadSugerida,
+      expectedCloseDate: newCloseDate || new Date().toISOString().split('T')[0],
       assignedRep: newRep,
       servicePackage: `${newEventType.replace('_', ' ')} (${newModality === 'modalidad_a_programa' ? 'Modalidad A' : 'Modalidad B'})`,
       notes: newNotes,
@@ -317,6 +331,9 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
 
     setNewTitle('');
     setNewNotes('');
+    const proxSemana = new Date();
+    proxSemana.setDate(proxSemana.getDate() + 7);
+    setNewCloseDate(proxSemana.toISOString().split('T')[0]);
     setIsModalOpen(false);
   };
 
@@ -518,7 +535,7 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
               placeholder="Buscar por universidad, evento o marca..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="input-develop w-full pl-10 pr-4 text-xs"
+              className="input-develop input-develop-con-icono w-full pr-4 text-xs"
             />
           </div>
 
@@ -941,7 +958,12 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="font-bold text-[#111111]">Etapa Inicial</label>
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-[#111111]">Etapa Inicial</label>
+                    <span className="text-[10px] font-semibold text-[#29008e] bg-[#29008e]/10 px-2 py-0.5 rounded-full">
+                      Probabilidad: {probabilidadSugerida}%
+                    </span>
+                  </div>
                   <select
                     value={newStage}
                     onChange={(e) => setNewStage(e.target.value as PipelineStage)}
@@ -956,16 +978,27 @@ export const DealsPipeline: React.FC<DealsPipelineProps> = ({
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="font-bold text-[#111111]">Consultor Asignado</label>
-                  <select
-                    value={newRep}
-                    onChange={(e) => setNewRep(e.target.value)}
-                    className="input-develop w-full"
-                  >
-                    <option value="Carlos Mendoza">Carlos Mendoza</option>
-                    <option value="Sofía Valenzuela">Sofía Valenzuela</option>
-                  </select>
+                  <label className="font-bold text-[#111111]">Fecha Programada / Cierre</label>
+                  <input
+                    type="date"
+                    required
+                    value={newCloseDate}
+                    onChange={(e) => setNewCloseDate(e.target.value)}
+                    className="input-develop w-full text-xs font-semibold text-[#0f094f]"
+                  />
                 </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-[#111111]">Consultor Asignado</label>
+                <select
+                  value={newRep}
+                  onChange={(e) => setNewRep(e.target.value)}
+                  className="input-develop w-full"
+                >
+                  <option value="Carlos Mendoza">Carlos Mendoza</option>
+                  <option value="Sofía Valenzuela">Sofía Valenzuela</option>
+                </select>
               </div>
 
               <div className="space-y-1.5">

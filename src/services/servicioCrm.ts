@@ -169,6 +169,32 @@ export function mapearOportunidadADeal(op: Oportunidad): Deal {
 }
 
 /**
+ * Convierte un Deal del frontend al formato canónico de inserción de Oportunidad para la base de datos.
+ */
+export function mapearDealAOportunidad(
+  deal: Deal
+): Omit<Oportunidad, 'id' | 'creado_en' | 'actualizado_en'> {
+  return {
+    titulo: deal.title,
+    universidad_id: deal.companyId,
+    contacto_principal_id: null,
+    monto_estimado: deal.amount,
+    etapa: deal.stage,
+    probabilidad_cierre: deal.probability,
+    fecha_cierre_esperada: deal.expectedCloseDate || null,
+    asesor_asignado: deal.assignedRep,
+    paquete_servicio: deal.servicePackage,
+    modalidad_proyecto: deal.projectModality,
+    tipo_evento: deal.eventType,
+    marcas_aliadas: deal.alliedBrands,
+    contador_alumnos_registrados: deal.registeredLeadsCount || 0,
+    notas: deal.notes || null,
+    ultimo_cambio_etapa: deal.lastStageChange || new Date().toISOString(),
+    datos_adicionales: {}
+  };
+}
+
+/**
  * Verifica si la instancia local de Supabase responde y retorna el conteo de universidades.
  */
 export async function verificarConexionBaseDatos(): Promise<{ conectada: boolean; totalUniversidades: number }> {

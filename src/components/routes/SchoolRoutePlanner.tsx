@@ -558,7 +558,7 @@ export const SchoolRoutePlanner: React.FC<SchoolRoutePlannerProps> = ({
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Buscar campus o municipio..."
-                className="input-develop w-full pl-10 pr-4 text-xs text-[#111111]"
+                className="input-develop input-develop-con-icono w-full pr-4 text-xs text-[#111111]"
               />
             </div>
           </div>

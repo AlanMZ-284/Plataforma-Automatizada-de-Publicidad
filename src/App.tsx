@@ -12,6 +12,7 @@ import { CompaniesList } from './components/crm/CompaniesList';
 import { SchoolRoutePlanner } from './components/routes/SchoolRoutePlanner';
 import { EventKitAndContentModule } from './components/events-kit/EventKitAndContentModule';
 import { FormularioRegistroAlumnoQr } from './components/publico/FormularioRegistroAlumnoQr';
+import { LoginView, PerfilUsuario, PERFILES_DEMO } from './components/auth/LoginView';
 import { MarketingAutomationModule } from './components/marketing/MarketingAutomationModule';
 import { ExecutiveRoiDashboard } from './components/analytics/ExecutiveRoiDashboard';
 import { generarCampanaAutomaticaParaOportunidad } from './services/servicioMarketing';
@@ -22,7 +23,9 @@ import {
   poblarDatosSemillaEnSupabase,
   limpiarBaseDatosSupabase,
   obtenerOportunidades,
-  mapearOportunidadADeal
+  guardarOportunidad,
+  mapearOportunidadADeal,
+  mapearDealAOportunidad
 } from './services/servicioCrm';
 import { 
   LayoutDashboard, 
@@ -39,7 +42,8 @@ import {
   RefreshCw,
   CheckCircle2,
   AlertTriangle,
-  HelpCircle
+  HelpCircle,
+  LogOut
 } from 'lucide-react';
 
 type MainView = 'crm-pipeline' | 'crm-schools' | 'routes' | 'events-kit' | 'marketing' | 'analitica-roi' | 'registro-alumno-qr';
@@ -48,6 +52,46 @@ export function App() {
   const [currentView, setCurrentView] = useState<MainView>('crm-pipeline');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Estado de autenticación y perfil de usuario activo
+  const [usuarioActivo, setUsuarioActivo] = useState<PerfilUsuario>(() => {
+    try {
+      const guardado = localStorage.getItem('pap_crm_perfil_usuario');
+      if (guardado) return JSON.parse(guardado);
+    } catch {}
+    return PERFILES_DEMO[0];
+  });
+
+  const [sesionIniciada, setSesionIniciada] = useState<boolean>(() => {
+    try {
+      const sesionGuardada = localStorage.getItem('pap_crm_sesion_activa');
+      if (sesionGuardada !== null) {
+        return sesionGuardada === 'true';
+      }
+    } catch {}
+    return true; // Sesión iniciada por defecto para no obstruir el flujo inicial
+  });
+
+  const manejarIniciarSesion = (perfil: PerfilUsuario) => {
+    setUsuarioActivo(perfil);
+    setSesionIniciada(true);
+    try {
+      localStorage.setItem('pap_crm_sesion_activa', 'true');
+      localStorage.setItem('pap_crm_perfil_usuario', JSON.stringify(perfil));
+    } catch {}
+    if (perfil.rol === 'promotor') {
+      setCurrentView('registro-alumno-qr');
+    } else {
+      setCurrentView('crm-pipeline');
+    }
+  };
+
+  const manejarCerrarSesion = () => {
+    setSesionIniciada(false);
+    try {
+      localStorage.setItem('pap_crm_sesion_activa', 'false');
+    } catch {}
+  };
   
   // Estado de conexión a base de datos Supabase
   const [estadoBd, setEstadoBd] = useState<{
@@ -97,12 +141,15 @@ export function App() {
 
   const [deals, setDeals] = useState<Deal[]>(() => {
     try {
-      const guardadas = localStorage.getItem('pap_crm_universidades_local');
-      if (guardadas !== null && JSON.parse(guardadas).length === 0) {
-        return [];
+      const guardadas = localStorage.getItem('pap_crm_oportunidades_local');
+      if (guardadas !== null) {
+        const parsed = JSON.parse(guardadas);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map(mapearOportunidadADeal);
+        }
       }
     } catch {}
-    return SEED_DEALS;
+    return [];
   });
 
   const [activities, setActivities] = useState<Activity[]>(SEED_ACTIVITIES);
@@ -152,7 +199,7 @@ export function App() {
       setCompanies(univsBd);
       if (oporBd && oporBd.length > 0) {
         setDeals(oporBd.map(mapearOportunidadADeal));
-      } else if (univsBd.length === 0) {
+      } else {
         setDeals([]);
       }
 
@@ -279,14 +326,26 @@ export function App() {
     }
   };
 
-  // Agregar nuevo trato
-  const handleAddDeal = (newDealData: Omit<Deal, 'id' | 'createdAt'>) => {
+  // Agregar nuevo trato con persistencia dual
+  const handleAddDeal = async (newDealData: Omit<Deal, 'id' | 'createdAt'>) => {
+    const idTemporal = `deal-${Date.now()}`;
     const newDeal: Deal = {
       ...newDealData,
-      id: `deal-${Date.now()}`,
+      id: idTemporal,
       createdAt: new Date().toISOString().split('T')[0]
     };
     setDeals((prev) => [newDeal, ...prev]);
+
+    // Persistir de inmediato en PostgreSQL Supabase y respaldo local
+    try {
+      const opoGuardada = await guardarOportunidad(mapearDealAOportunidad(newDeal));
+      if (opoGuardada) {
+        const dealPersistido = mapearOportunidadADeal(opoGuardada);
+        setDeals((prev) => prev.map((d) => (d.id === idTemporal ? dealPersistido : d)));
+      }
+    } catch (err) {
+      console.warn('Error persistiendo oportunidad:', err);
+    }
 
     // Registrar actividad en el CRM automáticamente
     const targetComp = companies.find((c) => c.id === newDeal.companyId);
@@ -295,7 +354,7 @@ export function App() {
       dealId: newDeal.id,
       type: 'task',
       title: `Oportunidad Creada: ${newDeal.title}`,
-      description: `Se abrió una nueva oportunidad comercial por $${newDeal.amount.toLocaleString('es-MX')} MXN para ${targetComp?.name}.`,
+      description: `Se abrió una nueva oportunidad comercial por $${newDeal.amount.toLocaleString('es-MX')} MXN para ${targetComp?.name || 'la institución'}.`,
       date: new Date().toISOString().replace('T', ' ').substring(0, 16),
       completed: true,
       author: newDeal.assignedRep
@@ -457,6 +516,11 @@ export function App() {
   ];
 
   const currentNav = navItems.find((n) => n.id === currentView) || navItems[0];
+  const inicialesUsuario = usuarioActivo.nombre.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
+
+  if (!sesionIniciada) {
+    return <LoginView onIniciarSesion={manejarIniciarSesion} />;
+  }
 
   return (
     <div className="h-screen w-full bg-[#F8F8FC] text-[#111111] flex overflow-hidden font-sans antialiased selection:bg-[#29008e] selection:text-white">
@@ -562,21 +626,32 @@ export function App() {
         </nav>
 
         {/* Perfil del Ejecutivo al pie del Sidebar */}
-        <div className={`p-3.5 border-t border-white/10 relative z-10 ${isSidebarCollapsed ? 'flex justify-center' : ''}`}>
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#29008e] to-[#f472b6] p-[1.5px] shadow-sm shrink-0">
-              <div className="w-full h-full rounded-[10px] bg-[#07052e] flex items-center justify-center text-xs font-bold text-white border border-white/20">
-                CM
-              </div>
-            </div>
-            {!isSidebarCollapsed && (
-              <div className="min-w-0">
-                <div className="font-bold text-xs text-white truncate">Carlos Mendoza</div>
-                <div className="text-[10px] text-[#a78bfa] font-medium flex items-center gap-1 truncate">
-                  <ShieldCheck className="w-3 h-3 text-[#a78bfa] shrink-0" />
-                  Partner de Vinculación
+        <div className={`p-3 border-t border-white/10 relative z-10 ${isSidebarCollapsed ? 'flex justify-center' : ''}`}>
+          <div className="flex items-center justify-between gap-2 min-w-0 w-full">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#29008e] to-[#f472b6] p-[1.5px] shadow-sm shrink-0">
+                <div className="w-full h-full rounded-[9px] bg-[#07052e] flex items-center justify-center text-[10px] font-bold text-white border border-white/20">
+                  {inicialesUsuario}
                 </div>
               </div>
+              {!isSidebarCollapsed && (
+                <div className="min-w-0">
+                  <div className="font-bold text-xs text-white truncate">{usuarioActivo.nombre}</div>
+                  <div className="text-[10px] text-[#a78bfa] font-medium flex items-center gap-1 truncate">
+                    <ShieldCheck className="w-3 h-3 text-[#a78bfa] shrink-0" />
+                    {usuarioActivo.etiquetaRol}
+                  </div>
+                </div>
+              )}
+            </div>
+            {!isSidebarCollapsed && (
+              <button
+                onClick={manejarCerrarSesion}
+                title="Cerrar sesión"
+                className="p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
             )}
           </div>
         </div>
@@ -651,19 +726,28 @@ export function App() {
 
             {/* Perfil en Drawer */}
             <div className="p-4 border-t border-white/10 relative z-10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#29008e] to-[#f472b6] p-[1.5px]">
-                  <div className="w-full h-full rounded-[10px] bg-[#07052e] flex items-center justify-center text-xs font-bold text-white">
-                    CM
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#29008e] to-[#f472b6] p-[1.5px] shrink-0">
+                    <div className="w-full h-full rounded-[10px] bg-[#07052e] flex items-center justify-center text-xs font-bold text-white">
+                      {inicialesUsuario}
+                    </div>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-bold text-xs text-white truncate">{usuarioActivo.nombre}</div>
+                    <div className="text-[10px] text-[#a78bfa] font-medium flex items-center gap-1 truncate">
+                      <ShieldCheck className="w-3 h-3 text-[#a78bfa] shrink-0" />
+                      {usuarioActivo.etiquetaRol}
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <div className="font-bold text-xs text-white">Carlos Mendoza</div>
-                  <div className="text-[10px] text-[#a78bfa] font-medium flex items-center gap-1">
-                    <ShieldCheck className="w-3 h-3 text-[#a78bfa]" />
-                    Partner de Vinculación
-                  </div>
-                </div>
+                <button
+                  onClick={manejarCerrarSesion}
+                  title="Cerrar sesión"
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white/80 transition-colors cursor-pointer shrink-0"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
               </div>
             </div>
           </aside>
@@ -752,17 +836,24 @@ export function App() {
               </button>
             </div>
 
-            {/* Ficha de Usuario en Topbar */}
+            {/* Ficha de Usuario en Topbar con acción de Cerrar Sesión */}
             <div className="flex items-center gap-2 pl-2 sm:border-l sm:border-black/5">
               <div className="text-right hidden md:block">
-                <div className="text-xs font-bold text-[#111111]">Carlos Mendoza</div>
-                <div className="text-[10px] text-[#555555]">Sede CDMX</div>
+                <div className="text-xs font-bold text-[#111111]">{usuarioActivo.nombre}</div>
+                <div className="text-[10px] text-[#555555]">{usuarioActivo.etiquetaRol}</div>
               </div>
               <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#29008e] to-[#f472b6] p-[1px]">
                 <div className="w-full h-full rounded-[10px] bg-[#07052e] flex items-center justify-center text-[10px] font-bold text-white">
-                  CM
+                  {inicialesUsuario}
                 </div>
               </div>
+              <button
+                onClick={manejarCerrarSesion}
+                title="Cerrar sesión y ver portal de acceso"
+                className="p-1.5 rounded-lg text-[#888888] hover:text-red-600 hover:bg-red-50 transition-colors ml-1 cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </header>
